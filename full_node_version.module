@@ -1,0 +1,1147 @@
+<?php
+// $Id: full_node_version.module,v 1.40 2008/02/27 15:32:05 robloach Exp $
+
+define('DEBUG', false);
+
+
+/**
+ * In this function we relmes for testing current superseded and working we all so
+ * add a rell form all if the node is not a node type accosiated with full node version
+ */
+function full_node_version_node_access_records($node) {
+  $type = $node->type;
+  $fnv_types =  variable_get('full_node_version_node_types', array());
+  if ( in_array($type, $fnv_types) ) {
+
+    if ($node->field_fnv_status) {
+      $status = array_map( create_function('$a',' return $a["value"];'),$node->field_fnv_status );
+
+      if (in_array('testing',$status)) {
+        $grants[] = array(
+          'realm' => 'fnv_testing',
+          'gid' => 1,
+          'grant_view' => TRUE,
+          'grant_update' => FALSE,
+          'grant_delete' => FALSE,
+          'priority' => 0,
+        );
+      }
+      if (in_array('current',$status)) {
+        $grants[] = array(
+          'realm' => 'fnv_current',
+          'gid' => 1,
+          'grant_view' => TRUE,
+          'grant_update' => FALSE,
+          'grant_delete' => FALSE,
+          'priority' => 0,
+        );
+      }
+      if (in_array('superseded',$status)) {
+        $grants[] = array(
+          'realm' => 'fnv_superseded',
+          'gid' => 1,
+          'grant_view' => TRUE,
+          'grant_update' => FALSE,
+          'grant_delete' => FALSE,
+          'priority' => 0,
+        );
+      }
+      else {
+        $grants[] = array(
+          'realm' => 'fnv_working',
+          'gid' => 1,
+          'grant_view' => TRUE,
+          'grant_update' => TRUE,
+          'grant_delete' => TRUE,
+          'priority' => 0,
+        );
+      }
+    }
+  }
+  else {/*
+    $grants = array(
+      'realm' => 'all',
+      'gid' => 1,
+      'grant_view' => TRUE,
+      'grant_update' => FALSE,
+      'grant_delete' => FALSE,
+      'priority' => 0,
+    );*/
+  }
+    return $grants;
+}
+/*
+ *  Here the user access arreays used in full node version are inited
+ */
+function full_node_version_perm() {
+ return array (
+   'full node version live',
+   'full node version test',
+   'full node version active',
+   'full node version superseded',
+   'administer full node version', 
+   'administer full node version on nodes', 
+   'review testing status',
+   
+ );
+}
+/*
+ *  This node gives grants to  realms based on the user permission for current testing working and superseded.  
+ *  It also grants all to gid 1 so that all content not associated with full node revision is displayed.
+ */
+function full_node_version_node_grants($account,$op) {
+
+  if ( user_access('full node version live') ) {
+    $grants['fnv_current'] = array(1); 
+  }
+  if ( user_access('full node version test') ) {
+    $grants['fnv_testing'] = array(1); 
+  }
+  if ( user_access('full node version active') ) {
+    $grants['fnv_working'] = array(1); 
+  }
+  if ($account->view_superseded) {
+    $grants['fnv_superseded'] = array(1); 
+  }
+  $grants["all"] = array(0);
+  return $grants;
+
+}
+/**
+ * Implementation of hook_menu() to add the admin section
+ */
+
+function full_node_version_menu() {
+  $items = array();
+  $items['admin/settings/full_node_version'] = array(
+    'title' => 'Full Node Version',
+    'page callback' => 'full_node_version_admin',
+    'access arguments' => array('administer full node version'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  $items['admin/content/review_testing_status'] = array(
+    'title' => 'Review Testing Status',
+    'page callback' => 'full_node_version_testing_status',
+    'access arguments' => array('review testing status'),
+    'type' => MENU_NORMAL_ITEM,
+  );
+  return $items;
+}
+
+/*
+ * This fuction builds a page to list all nodes of intererst 
+ * and thier testing status.
+ * nodes of interest are drafts and not drafts that are not suspended 
+ * and not in testing
+ */
+function full_node_version_testing_status() {
+  drupal_add_css(drupal_get_path('module','full_node_version') . "/full_node_version_testing_status.css", 'module');
+  drupal_add_js(drupal_get_path('module','full_node_version') . "/full_node_version_testing_status.js", 'module');
+  return drupal_get_form('full_node_version_testing_status_form');
+}
+/* build a form to list all nodes of intererst 
+ * and thier testing status.
+ * nodes of interest are drafts and not drafts that are not suspended 
+ * and not in testing
+ */
+function full_node_version_testing_status_form($form_state) {
+  $nodes = _full_node_version_status_of_nodes_array();
+  $form['testing_status'] = array (
+    '#type' => 'fieldset',
+    '#title' => t('Versions in Testing'),
+    '#description' =>t('Boxes checked indicate which version of a page is in testing, the draft version or the published version'),
+  );
+  $form['testing_publish'] = array (
+    '#type' => 'fieldset',
+    '#title' => t('Publishing Testing'),
+    '#description' =>t('Publshing Testing moves the pages in testing to produciton.'),
+  );
+  $form['testing_status']["title"] = array(
+    "#value" => "
+    <div class = 'form-checkboxes form-title'>
+    <div class = 'top-header'> </div><div class = 'header'>Page</div>
+    </div>
+    <div class = 'form-checkboxes'>
+      <div class = 'top-header'>In Testing</div>
+      <div class = 'form-item header '>Published</div>
+      <div class = 'form-item header '>Draft</div>
+    </div>
+    <div class = 'form-checkboxes'>
+      <div class = 'top-header'>In Production</div>
+    </div>
+    ",
+  );
+  foreach($nodes as $nid => $s) {
+    $in_production = false;
+    $n = node_load($nid);
+    if ($s['d'] == 1) {
+      $parent_nid = $n->field_fnv_revises[0]["nid"];
+      if ($parent_nid > 0) {
+        // if node is draft and has a parent then there are two options c and d
+        $options = array("c"=> "", "d"=>"");
+        if (full_node_version_is_status($parent_nid, 'current')) {
+          // if node is draft and it has a parent that is current the set is_production
+          $in_production = true;
+        }
+      }
+      else {
+        // if node is draft and has does not have a parent then there is only one option
+        // but not that while it is d it is place in the published column
+        $options = array("disabled"=> "", "d"=>"");
+      }
+      $parent_s = $nodes[$parent_nid];
+      // set defaults if in testing d if parent in testing then c else empty
+      if ($s['t'] == 1 ) {
+        $default = array("d");
+      }
+      else if ($parent_s['t'] ==1) {
+        $default = array("c");
+      }
+      else {
+        $default = array();
+      }
+    }
+    else if ($s['s'] ==0 && $s['t'] != $s['c']) {
+      //if not a draft, not superseded and testing does not = current 
+      //then there is one option of d 
+      $options = array("c"=> "", "disabled"=>"");
+      // set defaut if in testing 
+      // if not in test (and there for in production) set in_production
+      if ($s['t'] == 1 ) {
+        $default = array("d");
+      }
+      else {
+        $default = array();
+        $in_production = true;
+      }
+    }
+    // otherwise (not a draft or superseded or if not superseded testing = current) then skip
+    else { continue;}
+
+    $form['testing_status']["$nid-wrapper"]["title"] = array(
+      "#value" => t("<div class = 'form-checkboxes form-title'><div class= 'form-item page'><a href = '/node/$nid'>".$n->title."</a></div></div>"),
+    );
+    $form['testing_status']["$nid-wrapper"]["$nid"] = array(
+      '#type' => 'checkboxes',
+      '#options' => $options,
+      '#default_value' => $default,
+      '#attributes' => array('style' => 'clear:left'),
+    );
+
+    $image_string = "<img src = '/".drupal_get_path("module", "full_node_version")."/tick.png'>";
+    if (!$in_production) {
+      $image_string = "";
+    }
+    $form['testing_status']["$nid-wrapper"]["prod"] = array(
+      '#value' => "
+        <div class = 'form-checkboxes'>
+          <div class = 'form-item double'>$image_string
+          </div>
+        </div>
+      ",
+    );
+
+  }
+
+  $form['testing_status']['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+    '#weight' => 50,
+  );
+  $form['testing_publish']['publish_testing'] = array(
+    '#type' => 'submit',
+    '#value' => t('Publish Testing'),
+    '#submit' => array("full_node_version_testing_status_form_submit","full_node_version_publish_testing_submit"),
+    '#weight' => -49,
+  );
+  return $form;
+
+}
+/*
+ * this is the submit funciton for the form above, it changes the status of items
+ * as the have been change on the form
+ */
+function full_node_version_testing_status_form_submit($node, &$form_state) {
+  $values = $form_state['values'];
+  $nodes = _full_node_version_status_of_nodes_array();
+  foreach ($nodes as $nid => $s) {
+    if ($s = $values[$nid]) {
+      $n = node_load($nid);
+      $parent_nid = $n->field_fnv_revises[0]["nid"];
+      $parent_s = $nodes[$parent_nid];
+      if ($s['d']) {
+        full_node_version_status_add($nid, "testing");
+      }
+      else {
+        full_node_version_status_remove($nid, "testing");
+      }
+      if ($s['c']) {
+        full_node_version_status_add($parent_nid, "testing");
+      }
+      else {
+        full_node_version_status_remove($parent_nid, "testing");
+      }
+    }
+  }
+  drupal_set_message("Testing Status Saved");
+
+}
+
+/*
+ * Set up a pubish testing action if someone wants to use it
+ */
+function full_node_version_action_info () {
+  return array(
+    'full_node_version_publish_testing' => array(
+       'type' => 'system',
+       'description' => t('Promote Testing to Published'),
+       'configurable' => FALSE,
+       )
+  );
+}
+/* 
+ * is the publish testing submit fuction, it takes all the nodes on the 
+ * form and pass it to the publish_testing function
+ */
+function full_node_version_publish_testing_submit($node, &$form_state) {
+  $nids = array_keys($form_state['values']);
+  full_node_version_publish_testing($nids);
+}
+/* 
+ * Takes nodes testing status and promotes it to current
+ * IF not testing and current then remove current
+ * IF testing and draft then run draft_to_current
+ * IF testing and not draft  then add current
+ */
+function full_node_version_publish_testing($nids = true) {
+  $nodes = _full_node_version_status_of_nodes_array();
+  foreach ($nodes as $nid => $node_item) {
+    if (in_array($nid, $nids) || $nids == $true)  {
+      $n = node_load($nid);
+      if ($node_item['t'] == 0) {
+        if ($node_item['c'] == 1) {
+          full_node_version_status_remove($nid, "current");
+          drupal_set_message($n->title ." unpublished");
+        }
+        elseif ($node_item['d'] == 1) {
+          $current_nid = $n->field_fnv_revises[0]["nid"];
+          if (($parent_s =$nodes[$current_nid]) && ($parent_s['t'] != $parent_s['c'])) {
+            if($parent_s['t'] == 1) {
+              full_node_version_status_add($current_nid, "current");
+              drupal_set_message($n->title ." published");
+            }
+            else {
+              full_node_version_status_remove($current_nid, "current");
+              drupal_set_message($n->title ." unpublished");
+            }
+            
+          }
+
+        }
+      }  
+      else {
+        if ($node_item['d'] == 1) {
+          $current_nid = $n->field_fnv_revises[0]["nid"];
+          _draft_to_current($nid, $current_nid);
+          drupal_set_message("Draft of ".$n->title." published");
+        }
+        else {
+          full_node_version_status_add($nid, "current");
+          drupal_set_message($n->title." published");
+        }
+      }
+    }
+  }
+
+}
+
+/**
+ * This function builds the admin page
+ */
+function full_node_version_admin() {
+    return drupal_get_form('full_node_version_admin_form');
+}
+/**
+ * This funciton builds the form for the admin page
+ */
+function full_node_version_admin_form($form_state) {
+  $types = node_get_types();
+  $options = array();
+  $selected_types = variable_get('full_node_version_node_types',array());
+  foreach ($types as $key=>$type) {
+  $options[$key] = t($type->name);
+  }
+  $form['versioned_types'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Enable Full Node Version On'),
+    '#description' => t("The following node types will have full node versioning enabled."),
+    '#options' => $options,
+    '#default_value' => $selected_types,
+  );
+  $form['move_comments'] = array(
+    '#type' =>'checkbox',
+    '#title' =>'Move comments on Publish',
+    '#description' => t('When enabled, when a draft is published, all of the current node comments will be move to the draft node.'),
+    '#default_value' => variable_get("full_node_version_move_comments", false),
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+  );
+  return $form;
+}
+/**
+ * This is the Submit function for the admin form
+ * for each selected type save to the database and create cck field on they type.
+ */
+function full_node_version_admin_form_submit($form, $form_state) {
+
+  $selected_types = $form_state['values']['versioned_types'];
+  $move_comments = $form_state['values']['move_comments'] && TRUE;
+  $versioned_types = array();
+  foreach ($selected_types as $type) {
+    if ($type) {
+      array_push($versioned_types, $type);
+      _full_node_version_create_cck_fields ($type) ;
+    }
+  }
+  _update_field_fnv_revised_types($versioned_types);
+  variable_set('full_node_version_node_types', $versioned_types);
+  variable_set('full_node_version_move_comments', $move_comments);
+  drupal_set_message(t('full Node Version Settings have been updated. Please clear the <a href="/admin/settings/performance">cache</a>'));
+}
+/*
+ * This hook inserts the status form in the view of nodes with types being 
+ * run by the full node version
+ */
+function full_node_version_nodeapi(&$node, $op) {
+  
+  //var_export(content_fields('field_fnv_revises', 'page'));
+  $type = $node->type;
+  $full_node_version_node_types = variable_get('full_node_version_node_types',array());
+  // drupal_set_message(  ($op=='view' ) . "-" .       user_access('administer nodes') . "-".       user_access("edit any $type content") ."-".       in_array($type, $full_node_version_node_types)       );
+  
+  // // FIXME: This messes up our edit/published status, so disable for now
+  // if (($op=='load' ) && 
+  //      in_array($type, $full_node_version_node_types)
+  //    ) {
+  //   if (full_node_version_is_status($node,'superseded')) {
+  //     // global $user;
+  //     if( !node_access('view', $node) ) {
+  //       $new_node = full_node_version_revised_by($node);
+  //       DEBUG && drupal_set_message("Node " .  $node->nid . " has been superseded by node " . $new_node->nid . " " . $new_node->title);
+  //       $node = $new_node;
+  //     }
+  //   }
+  // }
+  if (($op=='load' ) && 
+       user_access('administer full node version on nodes') && 
+       in_array($type, $full_node_version_node_types)
+     ) {
+    //return array("full_node_version_status_form_rendered"=>drupal_get_form('full_node_version_status_form', $node));
+    //return array();
+  }
+  if (($op=='view' ) && 
+       user_access('administer full node version on nodes') && 
+       //user_access("edit any $type content") &&
+       in_array($type, $full_node_version_node_types)
+     ) {
+    drupal_add_js(drupal_get_path('module', 'full_node_version').'/full_node_version_status_box.js', 'module');
+    drupal_add_css(drupal_get_path('module', 'full_node_version').'/full_node_version_status_box.css', 'module');
+    //$form = drupal_get_form('full_node_version_status_form', $node);
+    //$node->content["status_form"]["#value"] = $form;
+  }
+  // // FIXME: Disabled this for new panels. See if it works.
+  // if($op=='insert') {
+  //   $parent_nid = $node->field_fnv_revises[0]["nid"];
+  //   $parent_did = db_result(db_query("SELECT did from {panels_node} where nid = %d", $parent_nid));
+  //   $child_did = $node->panels_node["did"];
+  //   if ($child_did && $parent_did) {
+  //     _full_node_version_new_draft_panel($child_did, $parent_did);   
+  //   }
+  // }
+}
+function full_node_version_status_html($node_in) {
+  $type = $node_in->type;
+  $full_node_version_node_types = variable_get('full_node_version_node_types',array());
+  if(user_access('administer full node version on nodes') && 
+       in_array($type, $full_node_version_node_types)) {
+    $form = drupal_get_form('full_node_version_status_form'.$node_in->nid, $node_in);
+    return $form;
+  }
+}
+/*
+ * This form is used on the view page to allow the publishing and unpublishing of 
+ * the draft and current version of a page
+ */
+
+function full_node_version_forms() {
+
+  # the form id Drupal plans on using will be the first 
+  # element of the first array.
+  $args = func_get_args();
+  $form_id = $args[0];
+  $node = $args[1];
+
+  # Given a form_id like mymodule_thing_form27 or mymodule_thing_form13,
+  # we look for familiar text to tell we are dealing with the correct
+  # form.  Other functions will call this function as part of their form
+  # rendering (e.g. search form rendering) so we need to tell them apart.
+  $forms = array();
+  if (strpos($form_id, "full_node_version_status_form") === 0) {
+
+    # Here we are telling the forms API that for any form ids starting
+    # with mymodule_thing_formX (X could be any unique id), callback to the
+    # function mymodule_thing_form to get the form data.  
+    $forms[$form_id] = array(
+      'callback' => 'full_node_version_status_form',
+      'callback arguments' => $node,
+    );
+  }
+  return $forms;
+
+}
+function full_node_version_status_form(&$form_state,$node) {
+  $is_draft = full_node_version_is_status($node, 'draft');
+  $current_nid = $is_draft ? $node->field_fnv_revises[0]["nid"] : $node->nid; 
+  $current_node = $is_draft ? node_load($node->field_fnv_revises[0]["nid"]) : $node; 
+  $draft_node = $is_draft   ? $node  : FALSE; 
+  $draft_nid = $is_draft   ? $node->nid  : FALSE; 
+  if ($current_nid == NULL) {}
+  $cl_checked = full_node_version_is_status($current_node, 'current') ? "checked" : "";
+  $ct_checked = full_node_version_is_status($current_node, 'testing')  ? "checked" : "";
+  $dl_checked = full_node_version_is_status($node, 'current')         ? "checked" : "";
+  $dt_checked = full_node_version_is_status($node, 'testing')         ? "checked" : "";
+
+  if ($is_draft && $current_node) {
+  $status_html = "
+    <table>
+      <tr><th></th><th>Draft</th><th>Published</th></tr>
+      <tr>
+        <th>In Production</th>
+        <td><input class = 'fnv_status_option fnv-draft-live' $dl_checked item= 'fnv-draft-live' type ='checkbox' /></td>
+        <td><input class = 'fnv_status_option fnv-current-live' $cl_checked item= 'fnv-current-live' type ='checkbox' /></td>
+      </tr>
+      <tr>
+        <th>In Testing</th>
+        <td><input class = 'fnv_status_option fnv-draft-test' $dt_checked item= 'fnv-draft-test' type ='checkbox' /></td>
+        <td><input class = 'fnv_status_option fnv-current-test' $ct_checked item= 'fnv-current-test' type ='checkbox' /></td>
+      </tr>
+    </table>
+    ";
+  }
+  elseif ($is_draft) {
+    $status_html = "
+    <table>
+      <tr><th></th><th>Draft</th></tr>
+      <tr>
+        <th>In Production</th>
+        <td><input class = 'fnv_status_option fnv-draft-live' $dl_checked item= 'fnv-draft-live' type ='checkbox' /></td>
+        </tr>
+      <tr>
+        <th>In Testing</th>
+        <td><input class = 'fnv_status_option fnv-draft-test' $dt_checked item= 'fnv-draft-test' type ='checkbox' /></td>
+      </tr>
+    </table>
+    ";
+  }
+  else {
+    $status_html = "
+    <table>
+      <tr><th></th><th>Current</th></tr>
+      <tr>
+        <th>Live</th>
+        <td><input class = 'fnv_status_option fnv-current-live' $cl_checked item= 'fnv-current-live' type ='checkbox' /></td>
+      </tr><tr>
+        <th>Test</th>
+        <td><input class = 'fnv_status_option fnv-current-test' $ct_checked item= 'fnv-current-test' type ='checkbox' /></td>
+      </tr></table>
+    ";
+  }
+  $form['div_tag'] = array('#type' => 'markup', '#value' => $status_html);
+  
+  $form['current_nid'] = array(
+    '#type' => 'hidden',
+    '#value' => $current_nid
+  );
+  $form['draft_nid'] = array(
+    '#type' => 'hidden',
+    '#value' => $draft_nid
+  );
+  // This field will be fill by js with a binary map of the chooses made on the page.
+  $form['fnv_save_status'] = array(
+    '#type' => 'textfield',
+    '#attributes'=>array('style'=>"display:none", "class"=>"edit-fnv-save-status"),
+    '#default_value' => '0'
+  );
+  $form["buttons"] = array (
+    '#type' => 'fieldset',
+    '#attributes'=>array('class'=>"buttons"),
+  );
+  $form["buttons"]['submit'] = array(
+    '#type' => 'submit',
+    '#value' => t('Save'),
+   // '#submit' => array("full_node_version_status_form_submit"=>array($node)),
+  );
+  $form["buttons"]['reset'] = array(
+    '#type' => 'button',
+    '#value' => t('Cancel'),
+  );
+  $form["#attributes"] = array("class" => "full-node-version-status-form");
+  $form["#submit"] = array("full_node_version_status_form_submit1");
+  return $form;
+}
+
+/*
+ * On submit we process the saved status binary with the following layout
+ * (Current is Live) (Current is test) (Draft Live) (Draft Test)
+ */
+function full_node_version_status_form_submit1($form,&$form_state) {
+  //retrive values from node
+  print "MADE IT MADE IT";
+  $bvalue = $form_state["values"]["fnv_save_status"];
+  $current_nid = $form_state["values"]["current_nid"];
+  $draft_nid   = $form_state["values"]["draft_nid"];
+  //provess the current node
+  if ($current_nid) {
+    if (($bvalue & 8) == 8) { //currentlive
+      $current_node = node_load($current_nid, NULL, true);
+      full_node_version_status_add($current_node, 'current');
+    }
+    else {
+      $current_node = node_load($current_nid, NULL, true);
+      full_node_version_status_remove($current_node, 'current');
+    }
+    if (($bvalue & 4) == 4) {//current test
+      $current_node = node_load($current_nid, NULL, true);
+      full_node_version_status_add($current_node, 'testing');
+    }
+    else {
+      $current_node = node_load($current_nid, NULL, true);
+      full_node_version_status_remove($current_node, 'testing');
+    }
+  }
+  // if there is a draft node process it 
+  if ($draft_nid) {
+    if (($bvalue & 2) ==2) { //draft live
+      full_node_version_status_remove($draft_nid, 'draft');
+      _draft_to_current($draft_nid , $current_nid);
+    }
+    else {
+      $draft_node = node_load($draft_nid, NULL, true);
+      full_node_version_status_remove($draft_node, 'current');
+    }
+    if (($bvalue & 1) == 1) { //draft test
+      $draft_node = node_load($draft_nid, NULL, true);
+      full_node_version_status_add($draft_node, 'testing');
+    }
+    else {
+      $draft_node = node_load($draft_nid, NULL, true);
+      full_node_version_status_remove($draft_node, 'testing');
+    }
+  }
+}
+
+
+/**
+ * Implements hook_form_alter()
+ * Here forms for nodes that have been selected in the admin section are modified
+ * If the form is not marked working (field_fnv_status ='working') then the new form 
+ * is a create form with all of the information from the old node
+ */
+function full_node_version_form_alter(&$form, $form_state, $form_id) {
+  // capture the node types that have fnv applied and then map them to form_ids 
+  $full_node_version_form_ids = 
+    array_map(
+      create_function('$a','return $a."_node_form";'),
+      variable_get('full_node_version_node_types',array())
+    );
+
+  // Only operate on node types that are under the control of fnv
+  if (array_search( $form_id,$full_node_version_form_ids) !== FALSE) {
+    $node = $form["#node"];
+    $type = $form["type"]["#value"];
+
+
+    //START create Status form item
+    
+    //if node is testing and not current then make as testing else mark as draft
+    $status_default = 'make_draft';
+    if ($node->field_fnv_status) {
+      $status_array = array_map( create_function('$a',' return $a["value"];'),$node->field_fnv_status );
+    }
+    else {
+      $status_array = array();
+    }
+    if ( 
+      in_array('testing',$status_array) &&
+      !in_array('current',$status_array)
+    ) {
+      $status_default = 'make_testing';  
+    }
+    if( user_access("administer full node version on nodes") ){
+      $status_options = array( 
+        'make_draft' => 'Draft', 
+        'make_testing' => 'In Testing', 
+      );
+      $form['buttonstop']['fnv_flow_status'] = array(
+        '#type' => 'radios',
+        '#title' => t('status'),
+        '#options' => $status_options,
+        '#default_value' => $status_default,
+        '#weight' => -50,
+      );
+    }
+    //END create Status form item
+ 
+    // check to see if this is a draft node
+    if (
+      ($node->field_fnv_status) &&
+      (array_search(
+        'draft',
+        array_map( create_function('$a',' return $a["value"];'),$node->field_fnv_status )
+      ) !== FALSE) 
+    ) {
+      //remove draft from path name
+
+      $form['buttonstop']['fnv_flow_status']['#options']['make_live'] = 'In Production'; 
+
+      $form["path"]["path"]["#default_value"] =  ereg_replace  ( "\_\(draft\)$"  ,"" ,  $form["path"]["path"]["#default_value"]);
+      //drupal_set_message("This is a update form");
+      //store the fnv_flow_status so we can see if it changes
+      $form['fnv_flow_status_previous'] = array(
+        '#type' => 'hidden',
+        '#title' => t('status'),
+        '#options' => $status_options,
+        '#default_value' => $status_default,
+      );
+    }
+    else {
+      //drupal_set_message("This is a new creation form");
+      //set not to process on drupal_retrieve_form
+
+      if (!$form["#node"]->new) {
+        // set the revises field
+        $form['field_fnv_revises'][0]["#default_value"] = array("nid"=> $node->nid);
+
+        if($node->type == "panel") {
+          /*
+          $addnode = $node;
+          $addnode->nid = false;
+          $addnode->path = $addnode->path ."_(draft)";
+          $addnode->field_fnv_revises = array(array("nid"=>$node->nid));
+          $addnode->panel_layout = "flexible";
+          $addnode->field_fnv_status = array(array("value"=>"draft"));
+          $addnode->new=true;
+          */
+          //print node_save($addnode);
+          $addnode = array('uid' => $user->uid, 'name' => $user->name, 'type' => $type, 'new' =>true, "panel_layout" =>"flexible");
+          $addform = drupal_retrieve_form('page_node_form', $form_state, $addnode);
+          $form["panels_node"]["layout"] = $addform["panels_node"]["layout"];
+        
+        }
+        else {
+          $addnode = array('uid' => $user->uid, 'name' => $user->name, 'type' => $type, 'new' =>true);
+          $addform = drupal_retrieve_form('page_node_form', $form_state, $addnode);
+        }
+          // for all fields that start with a # (all attrabute fields) copy the ones from the new
+          // $addform form
+          // also copy over the nid item
+          foreach ($addform as $key => $item) {
+            if (
+                 preg_match("/^#/",$key) 
+              || $key == "nid"
+              ) {
+              $form[$key] = $item;
+            }
+          }
+          // to clear the menu we must copy form menu #ite and menu mlid
+          $form["menu"]["#item"] = $addform["menu"]["#item"];
+          $form["menu"]["mlid"] = $addform["menu"]["mlid"];
+        
+      }
+    }
+    // modifify the delete object if we have a parent.
+    if ($form['field_fnv_revises'][0]['#default_value']["nid"] ) {
+      drupal_add_js('
+      $(document).ready(function() {
+        $("#edit-pathauto-perform-alias").click();
+        $("#edit-path").attr("disabled",false)
+        })'
+      , "inline");
+    
+    }
+    
+    if ( ($form['buttons']['delete']) ) {
+      array_unshift($form['buttons']['delete']["#submit"],"full_node_revision_node_revert");
+      $form['buttons']['delete']["#value"] = "Delete Draft";
+      $form['buttonstop']['delete']    = $form['buttons']['delete'] ;
+    }
+    $form['buttonstop']['#weight'] = -100;
+    $form['buttonstop']['#type'] = 'fieldset';
+    $form['buttonstop']['#attributes'] = array('class'=>"full_node_version_status");
+    $form['buttonstop']['submit'] = $form['buttons']['submit'] ;
+    $form['buttonstop']['preview']   = $form['buttons']['preview'];
+
+    //add our submit function
+    array_unshift($form["#validate"],"full_node_revision_node_validate");
+    array_push($form["#submit"],"full_node_revision_node_submit");
+  global $user;
+  $user->view_superseded = 1;
+  }
+}
+/*
+ * This function checks checks the fnv_flow_status and change the field_fnv_status before the 
+ * form is processed.
+ */
+function full_node_revision_node_validate($form, &$form_state) {
+
+  global $user;
+  $user->view_superseded = 1;
+  //Append Draft to end of path if we have a parent record and  there are no paths like it.
+  if ($parent_nid = $form_state['values']['field_fnv_revises'][0]["nid"]) {
+    //form_set_value($form["pathauto_perform_alias"],array("value"=>0), $form_state);
+    $src = "node/$parent_nid";
+    $dst =  urlencode($form_state["values"]["path"]);
+    if (db_fetch_array(db_query("SELECT pid FROM {url_alias} WHERE src != '%s' and dst = '%s' " , $src, $dst))) {
+      drupal_set_message("Path already used", 'error');
+      return FALSE;
+    }
+    else {
+    form_set_value($form["path"]["path"],$form_state["values"]["path"] . "_(draft)", $form_state);
+    }
+  }
+  $status_action = $form_state['values']['fnv_flow_status'];
+  form_set_value($form["field_fnv_status"],array(array("value"=>"draft")), $form_state);
+  $status_action_p = $form_state['values']['fnv_flow_status_previous'];
+  if ($status_action == $status_action_p) { $status_action = "none";}
+  switch($status_action) {
+    case "make_draft":
+      form_set_value($form["field_fnv_status"],array(array("value"=>"draft")), $form_state);
+    break;
+    case "make_testing" :
+      form_set_value($form["field_fnv_status"],array(array("value"=>"draft"), array("value"=>"testing")), $form_state);
+    break;
+    case "make_live":
+
+      form_set_value($form["field_fnv_status"],array(array("value"=>"current"),array("value"=>"testing")), $form_state);
+    break;
+  }
+}
+/** 
+ * This function is the submit function for fnv_node_form
+ * It purpose is to process changes to the parent node status
+ */
+function full_node_revision_node_submit($form, &$form_state) {
+  $status_action = $form_state['values']['fnv_flow_status'];
+  $status_action_p = $form_state['values']['fnv_flow_status_previous'];
+  if ($status_action == $status_action_p) { $status_action = "none";}
+  $parent_nid   = $form_state['values']['field_fnv_revises'][0]["nid"];
+  switch($status_action) {
+    case "make_draft":
+    // set parent to testing
+      full_node_version_status_add($parent_nid, "testing");
+    break;
+    case "make_testing" :
+    // remove parent testing
+      full_node_version_status_remove($parent_nid, "testing");
+    break;
+    case "make_live":
+    // set parent to not current 
+      _draft_to_current($form["nid"]["#value"] , $parent_nid);
+
+    break;
+  }
+  if ($form["nid"]["#value"] == NULL) {
+    full_node_version_status_add($parent_nid, "superseded");
+  }
+}
+/*
+ * This function change the status of the parent node before the child is removed
+ * removing the superseded status and seting the testing status if the draft was 
+ * testing
+ */
+function full_node_revision_node_revert($form, &$form_state) {
+
+  $parent_nid   = $form_state['values']['field_fnv_revises'][0]["nid"];
+
+  full_node_version_status_remove($parent_nid, "superseded");
+  if (full_node_version_is_status($form['#node'], 'testing')) {
+    full_node_version_status_add($parent_nid, "testing");
+  }
+
+}
+/*
+ * This function checks to see of there is a fnv_revises and fnv_status cck on the 
+ * node type if there is not then create it.
+ */
+function _full_node_version_create_cck_fields ($type) {
+module_load_include('inc', 'content', 'includes/content.crud');
+ 
+
+  $types = node_get_types();
+  foreach ($types as $typename =>$trash) {
+    $types[$typename] = 0;
+  }
+  $types[$type] = $type;
+  $field_fnv_revises = 
+    array ( 'field_name' => 'field_fnv_revises', 'type_name'
+      => 'page', 'display_settings' => array ( 'label' => array ( 'format' =>
+      'above',), 'teaser' => array ( 'format' => 'default',), 'full' => array (
+      'format' => 'default',), 4 => array ( 'format' => 'default',), 2 => array (
+      'format' => 'default',), 3 => array ( 'format' => 'default',),),
+      'widget_active' => '1', 'type' => 'nodereference', 'required' => '0',
+      'multiple' => '0', 'db_storage' => '1', 'module' => 'nodereference', 'active'
+      => '1', 'locked' => '0', 'columns' => array ( 'nid' => array ( 'type' =>
+      'int', 'unsigned' => true, 'not null' => false,),), 'referenceable_types' =>
+      $types, 'advanced_view' => '--', 'advanced_view_args' => '',
+      'widget' => array ( 'default_value' => array ( 0 => array ( 'nid' => NULL,
+      '_error_element' =>
+      'default_value_widget][field_fnv_revises][0][nid][nid',),),
+      'default_value_php' => NULL, 'label' => 'Revises', 'weight' => NULL,
+      'description' => '', 'type' => 'nodereference_autocomplete', 'module' =>
+      'nodereference',),);
+
+  $field_fnv_status = 
+    array ( 'field_name' => 'field_fnv_status', 'type_name' => 'page',
+      'display_settings' => array ( 'label' => array ( 'format' => 'above',),
+      'teaser' => array ( 'format' => 'default',), 'full' => array ( 'format' =>
+      'default',), 4 => array ( 'format' => 'default',), 2 => array ( 'format' =>
+      'default',), 3 => array ( 'format' => 'default',),), 'widget_active' => '1',
+      'type' => 'text', 'required' => '0', 'multiple' => '3', 'db_storage' => '0',
+      'module' => 'text', 'active' => '1', 'locked' => '0', 'columns' => array (
+      'value' => array ( 'type' => 'text', 'size' => 'big', 'not null' => false,
+      'sortable' => true,),), 'text_processing' => '0', 'max_length' => '',
+      'allowed_values' => "draft\ncurrent\nsuperseded\ntesting", 'allowed_values_php'
+      => '', 'widget' => array ( 'default_value' => array ( 0 => array ( 'value' =>
+      '', '_error_element' => 'default_value_widget][field_fnv_status][value',),),
+      'default_value_php' => NULL, 'label' => 'Full Node Version Status', 'weight' =>
+      NULL, 'description' => '', 'type' => 'optionwidgets_buttons', 'module' =>
+      'optionwidgets',),);
+
+  if (!(content_fields('field_fnv_status', $type))) {
+
+    $field_fnv_status['type_name'] = $type;
+    content_field_instance_create($field_fnv_status); 
+  }
+  if (!(content_fields('field_fnv_revises', $type))) {
+    $field_fnv_revises['type_name'] = $type;
+    content_field_instance_create($field_fnv_revises); 
+  }
+}
+   
+
+
+/*
+ * full_node_version_status is a function adding a fnv_status to a node
+ */
+function full_node_version_status_add($n, $status) {
+  if ($n ==NULL) {return;}
+  $node_in = $n;
+  if (!is_object($n)) {
+    $node_in = node_load($n, NULL, TRUE);
+  }
+  if (is_object($node_in)) {
+    if (!$node_in->field_fnv_status) {
+      $node_in->field_fnv_status = array();
+    }
+    $status_array = array_map(create_function('$a',' return $a["value"];'),$node_in->field_fnv_status);
+    if (!in_array($status,$status_array) ){
+      array_push( $node_in->field_fnv_status , array("value"=>$status) );
+    }
+    node_save($node_in);
+  }
+}
+/*
+ * full_node_in_version_status_remove is a functiothat removes a fnv_status from a node_in
+ */
+function full_node_version_status_remove($n, $status_in) {
+  if ($n == NULL) {return;}
+  $node_in = $n;
+  if (!is_object($n)) {
+    // TODO: This was cached, incorrectly?
+    $node_in = node_load($n, NULL, true);
+  }
+  DEBUG && drupal_set_message("full_node_version_status_remove($n->nid, $status_in)");
+  if (is_object($node_in) && is_array($node_in->field_fnv_status)) {
+    $status_array = array_map(create_function('$a',' return $a["value"];'),$node_in->field_fnv_status);
+    if ( in_array( $status_in , $status_array ) ) {
+      $key = array_search($status_in,$status_array);
+      array_splice( $node_in->field_fnv_status , $key,1 );
+    }
+    node_save($node_in);
+  }
+}
+/**
+ * full_node_in_version_is_status takes a node or nid and a status string.
+ * Returns boolean
+ */
+function full_node_version_is_status($n, $status_in) {
+
+  if ($n == NULL) { return false;}
+  $node_in = $n;
+  if (!is_object($n)) {
+    $node_in = node_load($n, NULL, true);
+  }
+  if (is_object($node_in) && is_array($node_in->field_fnv_status)) {
+    $status_array = array_map(create_function('$a' ,'return $a["value"];'), $node_in->field_fnv_status);
+    if ( in_array( $status_in , $status_array ) ) {
+      // DEBUG && drupal_set_message("full_node_version_is_status($n->nid, $status_in) == TRUE");
+      return true;
+    }
+    else {
+      // DEBUG && drupal_set_message("full_node_version_is_status($n->nid, $status_in) == false");
+      return false;
+    }
+  }
+}
+
+function full_node_version_revised_by($n) {
+  if ($n == NULL) { return false;}
+  $nid = $n;
+  if (is_object($n)) {
+    $nid = $n->nid;
+  }
+  // DEBUG && drupal_set_message("full_node_version_revised_by($nid)");
+  $new_nid = db_result(db_query("select nid from {content_field_fnv_revises} where field_fnv_revises_nid = %d", $nid));
+  return node_load($new_nid, NULL, true);
+
+
+}
+
+/*
+ * This is a helper function for publish a draft to current status
+ */
+function _draft_to_current($draft_nid = NULL , $current_nid = NULL ) {
+
+  if ($current_nid) {
+    drupal_set_message("Unpublishing current node $current_nid.");
+    $current_node = node_load($current_nid, NULL, true);
+    full_node_version_status_remove($current_node, "testing");
+    $current_node = node_load($current_nid, NULL, true);
+    full_node_version_status_remove($current_node, "current");
+    path_set_alias("node/$current_nid", NULL, NULL, 'en');
+    path_set_alias("node/$current_nid", $current_node->path ."-". $current_node->nid, NULL, 'en');
+  }
+  if ($draft_nid) {
+    drupal_set_message("Publishing draft node $draft_nid.");
+    $draft_node = node_load($draft_nid, NULL, true);
+    full_node_version_status_add($draft_node, "testing");
+    $draft_node = node_load($draft_nid, NULL, true);
+    full_node_version_status_add($draft_node, "current");
+    $draft_node = node_load($draft_nid, NULL, true);
+    full_node_version_status_remove($draft_node, "draft");
+    $draft_node = node_load($draft_nid, NULL, true);
+    path_set_alias("node/$draft_nid", NULL, NULL, 'en');
+    path_set_alias("node/$draft_nid", ereg_replace  ( "\_\(draft\)$"  ,"" , $draft_node->path), NULL, 'en');
+    if (variable_get("full_node_version_move_comments", false) ) {
+      db_query("UPDATE {comments} SET nid = %d WHERE nid = %d", $draft_nid, $current_nid);
+    }
+  }
+  DEBUG && drupal_set_message("module_invoke_all(\"fnv_publish_draft\", $draft_nid, $current_nid) DISABLED");
+  // FIXME: Disabled for debugging purposes
+  // module_invoke_all("fnv_publish_draft", $draft_nid, $current_nid);
+}
+
+function full_node_version_fnv_publish_draft($draft_nid, $current_nid) {
+
+  // =======  For Panels ==========//
+  if (module_exists("panels")) {
+    $panes = array();
+    $result = db_query("SELECT * FROM {panels_pane} WHERE type = 'node'");
+    while ($candidate = db_fetch_object($result)) {
+      $candidate->configuration = unserialize($candidate->configuration);
+      if ($current_nid == $candidate->configuration['nid']) {
+        array_push($panes, $candidate);
+      }
+    }
+    foreach($panes as $pane) {
+      $pane->configuration['nid'] = $draft_nid;
+      $query = "UPDATE {panels_pane} SET configuration = '%s' where pid = %d";
+      db_query($query, serialize($pane->configuration), $pane->pid);
+      drupal_set_message("Pane Updated");
+    }
+  }
+
+}
+
+/* 
+ * returns an array of node status of the shape
+ * $return[nid][d] = 0/1
+ *             [c] = 0/1
+ *             [t] = 0/1
+ *             [s] = 0/1
+ */
+function _full_node_version_status_of_nodes_array() {
+  
+  $fnv_types = variable_get('full_node_version_node_types',array());
+  $types_string = "";
+  foreach ($fnv_types as $type) {
+    $types_string .= "'$type',";
+  }
+  if ($types_string) {
+    $types_string = ereg_replace (",$","",$types_string);
+    $query = "
+      SELECT 
+        n.nid, 
+        CASE WHEN d.nid IS NOT NULL THEN 1 ELSE 0 END as d, 
+        CASE WHEN c.nid IS NOT NULL THEN 1 ELSE 0 END as c, 
+        CASE WHEN t.nid IS NOT NULL THEN 1 ELSE 0 END as t, 
+        CASE WHEN s.nid IS NOT NULL THEN 1 ELSE 0 END as s
+      FROM node n
+      LEFT JOIN content_field_fnv_status d ON n.nid = d.nid AND n.vid=d.vid AND d.field_fnv_status_value = 'draft'
+      LEFT JOIN content_field_fnv_status c ON n.nid = c.nid AND n.vid=c.vid AND c.field_fnv_status_value = 'current'
+      LEFT JOIN content_field_fnv_status t ON n.nid = t.nid AND n.vid=t.vid AND t.field_fnv_status_value = 'testing'
+      LEFT JOIN content_field_fnv_status s ON n.nid = s.nid AND n.vid=s.vid AND s.field_fnv_status_value = 'superseded'
+      WHERE type IN ($types_string)
+      ";
+    $result = db_query($query);
+    while ($row = db_fetch_array($result)) {
+      $return[$row['nid']] = $row;
+    }
+    return $return;
+  }
+}
+/*
+ * This is a helper funciton for update the cck field field_fnv_revises that
+ * allows all of the node types to be revised.
+ */
+function _update_field_fnv_revised_types($versioned_types) {
+  foreach ($versioned_types as $type) {
+    $new_types[$type] = $type;
+  }
+  $global_settings_string = db_result(db_query("select global_settings from {content_node_field} where field_name ='field_fnv_revises'"));
+  $global_settings = unserialize($global_settings_string);
+
+  $global_settings["referenceable_types"] = $new_types;
+  $global_settings_string = serialize($global_settings);
+  db_query("update {content_node_field} set global_settings = '%s' where field_name = 'field_fnv_revises'",$global_settings_string);
+
+
+}
+function _full_node_version_new_draft_panel($child_did, $parent_did) {
+
+
+db_query("UPDATE {panels_display} child , {panels_display} parent SET child.layout_settings=parent.layout_settings,child.panel_settings=parent.panel_settings,child.layout=parent.layout WHERE child.did=%d and parent.did=%d",$child_did, $parent_did);
+db_query("INSERT INTO panels_pane (did, panel, type, subtype, shown, access, visibility, configuration, cache, position) SELECT %d, panel, type, subtype, shown, access, visibility, configuration, cache, position FROM panels_pane WHERE did = %d", $child_did, $parent_did);
+
+
+}
+function full_node_version_file_references($file) {
+  $field_name = $file->field_name;
+  var_dump($file);
+  $fid = $file->fid;
+
+  if ( db_table_exists("content_$field_name") ) {
+    $query = "SELECT count(nid) FROM {content_%s} where %s_fid =%d";
+    $count = db_result(db_query($query,$field_name,$field_name, $fid));
+  }
+  else {
+  $query ="SELECT type_name FROM content_node_field_instance WHERE field_name = '%s'";
+  $table_name = db_result(db_query($query,$field_name));
+    $query = "SELECT count(nid) FROM {content_type_%s} where %s_fid =%d";
+    $count = db_result(db_query($query,$table_name,$field_name, $fid));
+  }
+  if ($count > 1) { return true; }
+  else { return false;}
+}

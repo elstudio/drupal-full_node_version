@@ -1,0 +1,34 @@
+#full-node-version-testing-status-form .form-checkboxes {
+  float:left;
+  width: 100px;
+  text-align:center;
+}
+#full-node-version-testing-status-form .form-display {
+  
+}
+#full-node-version-testing-status-form .form-checkboxes .form-item {
+  float:right;
+  width:50px;
+  text-align: center;
+}
+#full-node-version-testing-status-form .form-checkboxes .double {
+  width:100px;
+}
+#full-node-version-testing-status-form .form-checkboxes .page {
+  width:400px;
+  text-align: left;
+}
+#full-node-version-testing-status-form .form-title {
+  width : 400px;
+  clear:left;
+  text-align: left;
+}
+#full-node-version-testing-status-form #edit-submit {
+  float:right;
+}
+#full-node-version-testing-status-form .top-header {
+  font-size: .8em;
+  width: 100%;
+  height: 1em;
+  
+}
