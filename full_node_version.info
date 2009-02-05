@@ -5,8 +5,10 @@ core = 6.x
 package = "custom"
 
 ; Information added by drupal.org packaging script on 2008-02-27
-version = "6.x-1.0"
+version = "6.x-1.0dev"
 core = "6.x"
-project = "full_node_version"
+dependencies[] = nodereference
+dependencies[] = masquerade
+
 datestamp = "1204126811"
 
