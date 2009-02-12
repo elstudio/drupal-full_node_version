@@ -1,4 +1,61 @@
 <?php
+
+
+/*
+ * implimentations of hook_nodeapi()
+ */
+function full_node_version_nodeapi(&$node, $op) {
+  
+  $type = $node->type;
+  $full_node_version_node_types = variable_get('full_node_version_node_types',array());
+  if (($op=='delete' )) {
+    $query = db_query('DELETE FROM {full_node_version} WHERE nid = %d',$node->nid);
+
+  }
+  if (($op=='load' ) && 
+       in_array($type, $full_node_version_node_types)
+     ) {
+     $row = db_fetch_object(db_query('SELECT * FROM {full_node_version} WHERE nid =%d',$node->nid));
+     $revised_by = db_result(db_query('SELECT nid FROM {full_node_version} WHERE revises =%d',$node->nid));
+
+     $node->fnv_is_draft      = $row->is_draft;
+     $node->fnv_is_testing    = $row->is_testing;
+     $node->fnv_is_current    = $row->is_current;
+     $node->fnv_is_superseded = $row->is_superseded;
+     $node->fnv_revises       = $row->revises;
+     $node->fnv_revised_by    = $revised_by;
+  }
+  if (($op=='view' ) && 
+       in_array($type, $full_node_version_node_types)
+     ) {
+  }
+  if(($op=='insert' || $op=='update') &&
+       in_array($type, $full_node_version_node_types)
+     ) {
+    $query = db_query('
+    INSERT INTO {full_node_version} (nid,is_draft,is_testing, is_current, is_superseded,revises)
+    VALUES(%d, %d, %d,%d,%d,%d) 
+    ON DUPLICATE KEY UPDATE 
+      is_draft =%d, 
+      is_testing =%d, 
+      is_current =%d, 
+      is_superseded =%d, 
+      revises = %d',
+      $node->nid,
+      $node->fnv_is_draft,
+      $node->fnv_is_testing,
+      $node->fnv_is_current,
+      $node->fnv_is_superseded,
+      $node->fnv_revises,
+      $node->fnv_is_draft,
+      $node->fnv_is_testing,
+      $node->fnv_is_current,
+      $node->fnv_is_superseded,
+      $node->fnv_revises
+      );
+  }
+}
+
 /*
  * Adds a status to a node
  * 
@@ -98,6 +155,7 @@ function full_node_version_revised_by($n) {
     $nid = $n->nid;
   }
   $new_nid = db_result(db_query("select nid from {content_field_fnv_revises} where field_fnv_revises_nid = %d", $nid));
+  //$new_nid = db_result(db_query("select nid from {full_node_version} where revises = %d", $nid));
   return node_load($new_nid, NULL, true);
 
 
@@ -251,6 +309,7 @@ function _full_node_version_status_of_nodes_array() {
     return $return;
   }
 }
+
 /*
  * This is a helper funciton for update the cck field field_fnv_revises that
  * allows all of the node types to be revised.
@@ -294,3 +353,63 @@ function full_node_version_file_references($file) {
   if ($count > 1) { return true; }
   else { return false;}
 }
+
+function full_node_version_set_status($nid, $status=NULL, $revises=NULL) {
+
+  if(isset($status)) {
+  $status_code += in_array('draft',$status)      ? 8 : 0;
+  $status_code += in_array('current',$status)    ? 4 : 0;
+  $status_code += in_array('testing',$status)    ? 2 : 0;
+  $status_code += in_array('superseded',$status) ? 1 : 0;
+  }
+
+  if (isset($status) && isset($revises)) {
+    $query = db_query('INSERT INTO {full_node_version} (nid,status,revises) VALUES(%d, %d, %d) ON DUPLICATE KEY UPDATE status=%d, revises = %d',$nid, $status_code, $revises, $status_code, $revises);
+  }
+  elseif (isset($revises)) {
+    $query = db_query('INSERT INTO {full_node_version} (nid,status,revises) VALUES(%d, 0, %d) ON DUPLICATE KEY UPDATE revises = %d',$nid, $revises, $revises);
+  }
+
+
+
+}
+/*
+class full_node_version_status {
+  private  $status =  array();
+
+  function __construct($status_code) {
+    if (($status_code & 8) == 8) {
+      $this->status[] = 'draft';
+    }
+    if (($status_code & 4) == 4) {
+      $this->status[] = 'current';
+    }
+    if (($status_code & 2) == 2) {
+      $this->status[] = 'testing';
+    }
+    if (($status_code & 1) == 1) {
+      $this->status[] = 'superseded';
+    }
+  }
+  public function statusCode() {
+    $status_code += in_array('draft',$this->status)      ? 8 : 0;
+    $status_code += in_array('current',$this->status)    ? 4 : 0;
+    $status_code += in_array('testing',$this->status)    ? 2 : 0;
+    $status_code += in_array('superseded',$this->status) ? 1 : 0;
+    return $status_code;
+  }
+ 
+  public function addStatus($status) {
+      return $this->name;
+  }
+  public function removeStatus($status) {
+      return $this->name;
+  }
+  public function hasStatus($status) {
+    
+    return in_array($status,$this->status);    
+   }
+}
+*/
+
+

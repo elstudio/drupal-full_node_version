@@ -11,63 +11,48 @@ function full_node_version_node_access_records($node) {
   $type = $node->type;
   $fnv_types =  variable_get('full_node_version_node_types', array());
   if ( in_array($type, $fnv_types) ) {
-
-    if ($node->field_fnv_status) {
-      $status = array_map( create_function('$a',' return $a["value"];'),$node->field_fnv_status );
-
-      if (in_array('testing',$status)) {
-        $grants[] = array(
-          'realm' => 'fnv_testing',
-          'gid' => 1,
-          'grant_view' => TRUE,
-          'grant_update' => FALSE,
-          'grant_delete' => FALSE,
-          'priority' => 0,
-        );
-      }
-      if (in_array('current',$status)) {
-        $grants[] = array(
-          'realm' => 'fnv_current',
-          'gid' => 1,
-          'grant_view' => TRUE,
-          'grant_update' => FALSE,
-          'grant_delete' => FALSE,
-          'priority' => 0,
-        );
-      }
-      if (in_array('superseded',$status)) {
-        $grants[] = array(
-          'realm' => 'fnv_superseded',
-          'gid' => 1,
-          'grant_view' => TRUE,
-          'grant_update' => FALSE,
-          'grant_delete' => FALSE,
-          'priority' => 0,
-        );
-      }
-      else {
-        $grants[] = array(
-          'realm' => 'fnv_working',
-          'gid' => 1,
-          'grant_view' => TRUE,
-          'grant_update' => TRUE,
-          'grant_delete' => TRUE,
-          'priority' => 0,
-        );
-      }
+    if ($node->fnv_is_testing) {
+      $grants[] = array(
+        'realm' => 'fnv_testing',
+        'gid' => 1,
+        'grant_view' => TRUE,
+        'grant_update' => FALSE,
+        'grant_delete' => FALSE,
+        'priority' => 0,
+      );
+    }
+    if ($node->fnv_is_current) {
+      $grants[] = array(
+        'realm' => 'fnv_current',
+        'gid' => 1,
+        'grant_view' => TRUE,
+        'grant_update' => FALSE,
+        'grant_delete' => FALSE,
+        'priority' => 0,
+      );
+    }
+    if ($node->fnv_is_superseded) {
+      $grants[] = array(
+        'realm' => 'fnv_superseded',
+        'gid' => 1,
+        'grant_view' => TRUE,
+        'grant_update' => FALSE,
+        'grant_delete' => FALSE,
+        'priority' => 0,
+      );
+    }
+    else {
+      $grants[] = array(
+        'realm' => 'fnv_working',
+        'gid' => 1,
+        'grant_view' => TRUE,
+        'grant_update' => TRUE,
+        'grant_delete' => TRUE,
+        'priority' => 0,
+      );
     }
   }
-  else {/*
-    $grants = array(
-      'realm' => 'all',
-      'gid' => 1,
-      'grant_view' => TRUE,
-      'grant_update' => FALSE,
-      'grant_delete' => FALSE,
-      'priority' => 0,
-    );*/
-  }
-    return $grants;
+  return $grants;
 }
 
 /*

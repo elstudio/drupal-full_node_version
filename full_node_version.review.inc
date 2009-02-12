@@ -16,7 +16,6 @@ function full_node_version_testing_status() {
  * and not in testing
  */
 function full_node_version_testing_status_form($form_state) {
-  $nodes = _full_node_version_status_of_nodes_array();
   $form['testing_status'] = array (
     '#type' => 'fieldset',
     '#title' => t('Versions in Testing'),
@@ -42,6 +41,9 @@ function full_node_version_testing_status_form($form_state) {
     </div>
     ",
   );
+  /*
+   */
+  $nodes = _full_node_version_status_of_nodes_array();
   foreach($nodes as $nid => $s) {
     $in_production = false;
     $n = node_load($nid);

@@ -12,29 +12,27 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
       create_function('$a','return $a."_node_form";'),
       variable_get('full_node_version_node_types',array())
     );
-
   // Only operate on node types that are under the control of fnv
   if (array_search( $form_id,$full_node_version_form_ids) !== FALSE) {
     $node = $form["#node"];
     $type = $form["type"]["#value"];
-
+    //grab current node fnv info
+    $form['fnv_revises']       = array('#type' =>'hidden', '#value'=>$node->fnv_revises);
+    $form['fnv_is_draft']      = array('#type' =>'hidden', '#value'=>$node->fnv_is_draft);
+    $form['fnv_is_testing']    = array('#type' =>'hidden', '#value'=>$node->fnv_is_testing);
+    $form['fnv_is_current']    = array('#type' =>'hidden', '#value'=>$node->fnv_is_current);
+    $form['fnv_is_superseded'] = array('#type' =>'hidden', '#value'=>$node->fnv_is_superseded);
 
     //START create Status form item
     
     //if node is testing and not current then make as testing else mark as draft
-    $status_default = 'make_draft';
-    if ($node->field_fnv_status) {
-      $status_array = array_map( create_function('$a',' return $a["value"];'),$node->field_fnv_status );
-    }
-    else {
-      $status_array = array();
-    }
-    if ( 
-      in_array('testing',$status_array) &&
-      !in_array('current',$status_array)
-    ) {
+    if ($node->fnv_is_testing &&!$node->fnv_is_current) {
       $status_default = 'make_testing';  
     }
+    else {
+      $status_default = 'make_draft';
+    }
+    // create top button if perm allow
     if( user_access("administer full node version on nodes") ){
       $status_options = array( 
         'make_draft' => 'Draft', 
@@ -51,74 +49,53 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
     //END create Status form item
  
     // check to see if this is a draft node
-    if (
-      ($node->field_fnv_status) &&
-      (array_search(
-        'draft',
-        array_map( create_function('$a',' return $a["value"];'),$node->field_fnv_status )
-      ) !== FALSE) 
-    ) {
-      //remove draft from path name
-
+    if ($node->fnv_is_draft) {
+      //added option to go to production
       $form['buttonstop']['fnv_flow_status']['#options']['make_live'] = 'In Production'; 
 
+      //remove draft from path name
       $form["path"]["path"]["#default_value"] =  ereg_replace  ( "\_\(draft\)$"  ,"" ,  $form["path"]["path"]["#default_value"]);
-      //drupal_set_message("This is a update form");
       //store the fnv_flow_status so we can see if it changes
       $form['fnv_flow_status_previous'] = array(
         '#type' => 'hidden',
-        '#title' => t('status'),
-        '#options' => $status_options,
-        '#default_value' => $status_default,
+        '#value' => $status_default,
       );
     }
-    else {
-      //drupal_set_message("This is a new creation form");
-      //set not to process on drupal_retrieve_form
+    else { //node was not a draft
 
+      //set not to process on drupal_retrieve_form
       if (!$form["#node"]->new) {
         // set the revises field
-        $form['field_fnv_revises'][0]["#default_value"] = array("nid"=> $node->nid);
+        $form['fnv_revises'] = array('#type' =>'hidden', '#value'=>$node->nid);
 
         if($node->type == "panel") {
-          /*
-          $addnode = $node;
-          $addnode->nid = false;
-          $addnode->path = $addnode->path ."_(draft)";
-          $addnode->field_fnv_revises = array(array("nid"=>$node->nid));
-          $addnode->panel_layout = "flexible";
-          $addnode->field_fnv_status = array(array("value"=>"draft"));
-          $addnode->new=true;
-          */
-          //print node_save($addnode);
           $addnode = array('uid' => $user->uid, 'name' => $user->name, 'type' => $type, 'new' =>true, "panel_layout" =>"flexible");
           $addform = drupal_retrieve_form('page_node_form', $form_state, $addnode);
           $form["panels_node"]["layout"] = $addform["panels_node"]["layout"];
-        
         }
         else {
           $addnode = array('uid' => $user->uid, 'name' => $user->name, 'type' => $type, 'new' =>true);
           $addform = drupal_retrieve_form('page_node_form', $form_state, $addnode);
         }
-          // for all fields that start with a # (all attrabute fields) copy the ones from the new
-          // $addform form
-          // also copy over the nid item
-          foreach ($addform as $key => $item) {
-            if (
-                 preg_match("/^#/",$key) 
-              || $key == "nid"
-              ) {
-              $form[$key] = $item;
-            }
+        // for all fields that start with a # (all attrabute fields) copy the ones from the new
+        // $addform form
+        // also copy over the nid item
+        foreach ($addform as $key => $item) {
+          if (
+               preg_match("/^#/",$key) 
+            || $key == "nid"
+            ) {
+            $form[$key] = $item;
           }
-          // to clear the menu we must copy form menu #ite and menu mlid
-          $form["menu"]["#item"] = $addform["menu"]["#item"];
-          $form["menu"]["mlid"] = $addform["menu"]["mlid"];
+        }
+        // to clear the menu we must copy form menu #item and menu mlid
+        $form["menu"]["#item"] = $addform["menu"]["#item"];
+        $form["menu"]["mlid"] = $addform["menu"]["mlid"];
         
       }
     }
     // modifify the delete object if we have a parent.
-    if ($form['field_fnv_revises'][0]['#default_value']["nid"] ) {
+    if ($form['fnv_revises'] ) {
       drupal_add_js('
       $(document).ready(function() {
         $("#edit-pathauto-perform-alias").click();
@@ -131,13 +108,13 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
     if ( ($form['buttons']['delete']) ) {
       array_unshift($form['buttons']['delete']["#submit"],"full_node_revision_node_revert");
       $form['buttons']['delete']["#value"] = "Delete Draft";
-      $form['buttonstop']['delete']    = $form['buttons']['delete'] ;
     }
     $form['buttonstop']['#weight'] = -100;
     $form['buttonstop']['#type'] = 'fieldset';
     $form['buttonstop']['#attributes'] = array('class'=>"full_node_version_status");
     $form['buttonstop']['submit'] = $form['buttons']['submit'] ;
     $form['buttonstop']['preview']   = $form['buttons']['preview'];
+    $form['buttonstop']['delete']   = $form['buttons']['delete'];
 
     //add our submit function
     array_unshift($form["#validate"],"full_node_revision_node_validate");
@@ -147,16 +124,15 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
   }
 }
 /*
- * This function checks checks the fnv_flow_status and change the field_fnv_status before the 
- * form is processed.
+ * Implementation of form validate
+ * This function checks to ensure that the path is converted a draft path
  */
 function full_node_revision_node_validate($form, &$form_state) {
 
   global $user;
   $user->view_superseded = 1;
   //Append Draft to end of path if we have a parent record and  there are no paths like it.
-  if ($parent_nid = $form_state['values']['field_fnv_revises'][0]["nid"]) {
-    //form_set_value($form["pathauto_perform_alias"],array("value"=>0), $form_state);
+  if ($parent_nid = $form_state['values']['fnv_revises']) {
     $src = "node/$parent_nid";
     $dst =  urlencode($form_state["values"]["path"]);
     if (db_fetch_array(db_query("SELECT pid FROM {url_alias} WHERE src != '%s' and dst = '%s' " , $src, $dst))) {
@@ -167,22 +143,6 @@ function full_node_revision_node_validate($form, &$form_state) {
     form_set_value($form["path"]["path"],$form_state["values"]["path"] . "_(draft)", $form_state);
     }
   }
-  $status_action = $form_state['values']['fnv_flow_status'];
-  form_set_value($form["field_fnv_status"],array(array("value"=>"draft")), $form_state);
-  $status_action_p = $form_state['values']['fnv_flow_status_previous'];
-  if ($status_action == $status_action_p) { $status_action = "none";}
-  switch($status_action) {
-    case "make_draft":
-      form_set_value($form["field_fnv_status"],array(array("value"=>"draft")), $form_state);
-    break;
-    case "make_testing" :
-      form_set_value($form["field_fnv_status"],array(array("value"=>"draft"), array("value"=>"testing")), $form_state);
-    break;
-    case "make_live":
-
-      form_set_value($form["field_fnv_status"],array(array("value"=>"current"),array("value"=>"testing")), $form_state);
-    break;
-  }
 }
 /** 
  * This function is the submit function for fnv_node_form
@@ -192,38 +152,66 @@ function full_node_revision_node_submit($form, &$form_state) {
   $status_action = $form_state['values']['fnv_flow_status'];
   $status_action_p = $form_state['values']['fnv_flow_status_previous'];
   if ($status_action == $status_action_p) { $status_action = "none";}
-  $parent_nid   = $form_state['values']['field_fnv_revises'][0]["nid"];
+  //$parent_nid   = $form_state['values']['field_fnv_revises'][0]["nid"];
+  if($parent_node = node_load($form_state['values']['fnv_revises'])) {
+    $parent_exists = true;
+  }
+  if ($form["nid"]["#value"] == NULL) {
+    //full_node_version_status_add($parent_nid, "superseded");
+      $form_state['values']['fnv_is_testing'] = 0;
+      $form_state['values']['fnv_is_current'] = 0;
+      $form_state['values']['fnv_is_draft']   = 0;
+      $parent_node->fnv_is_superseded = 1;
+  }
   switch($status_action) {
     case "make_draft":
     // set parent to testing
-      full_node_version_status_add($parent_nid, "testing");
+
+      //full_node_version_status_add($parent_nid, "testing");
+      $parent_node->fnv_is_testing = 1;
+      $form_state['values']['fnv_is_draft']   = 1;
+      $form_state['values']['fnv_is_testing'] = 0;
     break;
     case "make_testing" :
     // remove parent testing
-      full_node_version_status_remove($parent_nid, "testing");
+      //full_node_version_status_remove($parent_nid, "testing");
+      $parent_node->fnv_is_testing = 0;
+      $form_state['values']['fnv_is_testing'] = 1;
     break;
     case "make_live":
     // set parent to not current 
-      _draft_to_current($form["nid"]["#value"] , $parent_nid);
+      //_draft_to_current($form["nid"]["#value"] , $parent_nid);
 
+
+      $form_state['values']['fnv_is_testing'] = 1;
+      $form_state['values']['fnv_is_current'] = 1;
+      $form_state['values']['fnv_is_draft']   = 0;
+      $form_state['values']['fnv_is_draft']   = 0;
+      $form_state['values']['path'] = ereg_replace( "\_\(draft\)$","",$form_state['values']['path'] );
+ 
+      //ajust parent node
+      $parent_node->fnv_is_testing = 0;
+      $parent_node->fnv_is_current = 0;
+      $parent_node->path .= "-" . $parent_node->nid; 
     break;
   }
-  if ($form["nid"]["#value"] == NULL) {
-    full_node_version_status_add($parent_nid, "superseded");
-  }
+  if ($parent_exists) { node_save($parent_node);}
 }
 /*
  * This function change the status of the parent node before the child is removed
  * removing the superseded status and seting the testing status if the draft was 
  * testing
  */
-function full_node_revision_node_revert($form, &$form_state) {
+function full_node_revision_node_revert($form, &$form_state) { 
 
-  $parent_nid   = $form_state['values']['field_fnv_revises'][0]["nid"];
-
-  full_node_version_status_remove($parent_nid, "superseded");
-  if (full_node_version_is_status($form['#node'], 'testing')) {
-    full_node_version_status_add($parent_nid, "testing");
+  if($parent_node = node_load($form_state['values']['fnv_revises'])) {
+    // parent is no longer superseded
+    $parent_node->fnv_is_superseded = 0;
+    // if child whas in testing put parent back in testing
+    if ($form['#node']->fnv_is_testing) {
+      $parent_node->fnv_is_testing = 1;
+    }
+    node_save($parent_node);
   }
 
 }

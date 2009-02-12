@@ -1,0 +1,51 @@
+<?php
+function full_node_version_schema() {
+  $schema['full_node_version'] = array(
+    'description' => t('Stores Status and Revised by info'),
+    'fields' => array(
+      'nid' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'description' => t('The {node}.nid that this row is for.'),
+      ),
+      'is_draft' => array(
+        'type' => 'int',
+        'default' => 0,
+        'not null' => TRUE,
+        'description' => t('0,1 if the node has a status if draft'),
+      ),
+      'is_current' => array(
+        'type' => 'int',
+        'default' => 0,
+        'not null' => TRUE,
+        'description' => t('0,1 if the node has a status if current'),
+      ),
+      'is_superseded' => array(
+        'type' => 'int',
+        'default' => 0,
+        'not null' => TRUE,
+        'description' => t('0,1 if the node has a status if superseded'),
+      ),
+      'is_testing' => array(
+        'type' => 'int',
+        'default' => 0,
+        'not null' => TRUE,
+        'description' => t('0,1 if the node has a status if testing'),
+      ),
+      'revises' => array(
+        'type' => 'int',
+        'not null' => FALSE,
+        'description' => t('The {node}.nid that revised this row.'),
+      ),
+    ),
+    'primary key' => array('nid'),
+  );
+  return $schema;
+}
+
+function full_node_version_uninstall(){
+    drupal_uninstall_schema('full_node_version');
+}
+function full_node_version_install(){
+    drupal_install_schema('full_node_version');
+}
