@@ -15,13 +15,25 @@ function full_node_version_nodeapi(&$node, $op) {
   if (($op=='load' ) && 
        in_array($type, $full_node_version_node_types)
      ) {
-     $row = db_fetch_object(db_query('SELECT * FROM {full_node_version} WHERE nid =%d',$node->nid));
-     $revised_by = db_result(db_query('SELECT nid FROM {full_node_version} WHERE revises =%d',$node->nid));
+     $row = db_fetch_object(db_query(
+     'SELECT c.*,
+             p.is_draft as parent_is_draft,
+             p.is_current as parent_is_current,
+             p.is_testing as parent_is_testing,
+             p.is_superseded as parent_is_superseded
+             FROM {full_node_version} c 
+             LEFT JOIN {full_node_version p ON p.nid = c.revises
+             WHERE c.nid =%d',$node->nid));
+     $revised_by = db_result(db_query('SELECT * FROM {full_node_version} WHERE revises =%d',$node->nid));
 
      $node->fnv_is_draft      = $row->is_draft;
      $node->fnv_is_testing    = $row->is_testing;
      $node->fnv_is_current    = $row->is_current;
      $node->fnv_is_superseded = $row->is_superseded;
+     $node->fnv_parent_is_draft      = $row->parent_is_draft;
+     $node->fnv_parent_is_testing    = $row->parent_is_testing;
+     $node->fnv_parent_is_current    = $row->parent_is_current;
+     $node->fnv_parent_is_superseded = $row->parent_is_superseded;
      $node->fnv_revises       = $row->revises;
      $node->fnv_revised_by    = $revised_by;
   }
@@ -54,6 +66,59 @@ function full_node_version_nodeapi(&$node, $op) {
       $node->fnv_revises
       );
   }
+}
+/*
+ * retrives node that match the status params
+ * the status has an array of status for the child node and parent_status an array of status for the parent node
+ * @PARAM status:
+ *   an array whose key can be is_current, is_draft, is_testing, is_superseded and values are (1,0)
+ * @PARAM parent_status:
+ *   an array whose key can be is_current, is_draft, is_testing, is_superseded and values are (1,0)
+ *   or it can be true or false
+ * @return
+ *  and array of node object created by node_load
+ */
+function full_node_version_get_nodes($status=array(), $has_parent=NULL) {
+  $statuses = array('c.is_current', 'c.is_draft', 'c.is_testing','c.is_superseded','p.is_current', 'p.is_draft', 'p.is_testing','p.is_superseded');
+  $c_statuses = array('is_current', 'is_draft', 'is_testing','is_superseded');
+  $where_items=array();
+  foreach($status as $k=>$v) {
+    $operator = '=';
+    $k = in_array($k, $c_statuses) ? "c.$k" : $k;
+    if (in_array($k, $statuses)) {
+      if(substr($v,0,1)=="!") {
+        $operator = '!=';
+        $v = substr($v,1);
+      }
+      $v = in_array($v, $c_statuses) ? "c.$v" : $v;
+      if (in_array($v, $statuses)) {
+        $where_items["$k $operator $v"]    = NULL;
+      }
+      elseif (is_numeric($v)) {
+        $where_items["$k $operator %d"]    = $v;
+      }
+    }
+  }
+  if ($has_parent === true)  { $where_items['p.nid is %s'] = 'NOT NULL';}
+  if ($has_parent === false) { $where_items['p.nid is %s'] = 'NULL';}
+  $where_clause = implode(' and ', array_keys($where_items));
+  if ($where_clause) {$where_clause = "WHERE $where_clause";}
+  drupal_set_message($where_clause);
+  $result = db_query(
+      "SELECT c.nid 
+         FROM {full_node_version} c 
+    LEFT JOIN {full_node_version} p ON c.revises = p.nid
+              $where_clause
+    ",$where_items);
+  $nodes = array();
+  while($row = db_fetch_object($result)) {
+   $nodes[$row->nid] = node_load($row->nid);
+  }
+  return $nodes;
+}
+$nodes = full_node_version_get_nodes($status=array('is_current'=>'!c.is_draft'));
+foreach ($nodes as $n) {
+  drupal_set_message($n->fnv_parent_is_current);
 }
 
 /*

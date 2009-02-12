@@ -44,6 +44,23 @@ function full_node_version_testing_status_form($form_state) {
   /*
    */
   $nodes = _full_node_version_status_of_nodes_array();
+        // if node is draft and has a parent then there are two options c and d
+  $nodes = array();
+  //get nodes that are draft with parent current
+  foreach (full_node_version_get_nodes(array('is_draft'=>1), true) as $n) {
+    $nodes[$n->nid]['#node'] =$n;
+    $nodes[$n->nid]['options'] = array("c"=> "", "d"=>"");
+    $nodes[$n->nid]['in_production'] = $n->fvn_parent_is_current;
+  }
+  //get nodes that are draft with no parent
+  foreach (full_node_version_get_nodes(array('is_draft'=>1), false) as $n) {
+    $nodes[$n->nid]['#node'] =$n;
+    $nodes[$n->nid]['options'] = array("disabled"=> "", "d"=>"");
+    $nodes[$n->nid]['in_production'] = 0;
+  }
+      //if not a draft, not superseded and testing does not = current 
+  foreach (full_node_version_get_nodes(array('is_draft'=>0,'is_superseded'=>0,'is_testing'=>'!is_current' )) as $n) {
+  }
   foreach($nodes as $nid => $s) {
     $in_production = false;
     $n = node_load($nid);
@@ -130,7 +147,6 @@ function full_node_version_testing_status_form($form_state) {
   return $form;
 
 }
-
 /*
  * this is the submit funciton for the form above, it changes the status of items
  * as the have been change on the form
