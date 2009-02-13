@@ -64,7 +64,40 @@ function full_node_version_nodeapi(&$node, $op) {
       $node->fnv_is_current,
       $node->fnv_is_superseded,
       $node->fnv_revises
+    );
+    if ($node->fnv_revises) {
+      $query = db_query('
+      INSERT INTO {full_node_version} (nid,is_draft,is_testing, is_current, is_superseded)
+      VALUES(%d, %d, %d,%d,%d) 
+      ON DUPLICATE KEY UPDATE 
+        is_draft =%d, 
+        is_testing =%d, 
+        is_current =%d, 
+        is_superseded =%d',
+        $node->fnv_revises,
+        $node->fnv_parent_is_draft,
+        $node->fnv_parent_is_testing,
+        $node->fnv_parent_is_current,
+        $node->fnv_parent_is_superseded,
+        $node->fnv_parent_is_draft,
+        $node->fnv_parent_is_testing,
+        $node->fnv_parent_is_current,
+        $node->fnv_parent_is_superseded
       );
+      $parent_node=node_load($node->fnv_revises,NULL, TRUE);
+      node_access_acquire_grants($parent_node);
+    }
+    if ($node->fnv_revised_by) {
+      $query = db_query('
+      INSERT INTO {full_node_version} (nid,revises)
+      VALUES(%d, %d) 
+      ON DUPLICATE KEY UPDATE 
+      revises = %d',
+        $node->fnv_revised_by,
+        $node->nid,
+        $node->nid
+      );
+    }
   }
 }
 /*
@@ -103,7 +136,6 @@ function full_node_version_get_nodes($status=array(), $has_parent=NULL) {
   if ($has_parent === false) { $where_items['p.nid is %s'] = 'NULL';}
   $where_clause = implode(' and ', array_keys($where_items));
   if ($where_clause) {$where_clause = "WHERE $where_clause";}
-  drupal_set_message($where_clause);
   $result = db_query(
       "SELECT c.nid 
          FROM {full_node_version} c 
@@ -118,7 +150,6 @@ function full_node_version_get_nodes($status=array(), $has_parent=NULL) {
 }
 $nodes = full_node_version_get_nodes($status=array('is_current'=>'!c.is_draft'));
 foreach ($nodes as $n) {
-  drupal_set_message($n->fnv_parent_is_current);
 }
 
 /*

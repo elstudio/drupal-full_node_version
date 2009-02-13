@@ -22,6 +22,11 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
     $form['fnv_is_testing']    = array('#type' =>'hidden', '#value'=>$node->fnv_is_testing);
     $form['fnv_is_current']    = array('#type' =>'hidden', '#value'=>$node->fnv_is_current);
     $form['fnv_is_superseded'] = array('#type' =>'hidden', '#value'=>$node->fnv_is_superseded);
+    $form['fnv_revised_by']       = array('#type' =>'hidden', '#value'=>$node->fnv_revise_by);
+    $form['fnv_parent_is_draft']      = array('#type' =>'hidden', '#value'=>$node->fnv_parent_is_draft);
+    $form['fnv_parent_is_testing']    = array('#type' =>'hidden', '#value'=>$node->fnv_parent_is_testing);
+    $form['fnv_parent_is_current']    = array('#type' =>'hidden', '#value'=>$node->fnv_parent_is_current);
+    $form['fnv_parent_is_superseded'] = array('#type' =>'hidden', '#value'=>$node->fnv_parent_is_superseded);
 
     //START create Status form item
     
@@ -62,6 +67,10 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
       );
     }
     else { //node was not a draft
+      $form['fnv_parent_is_draft']      = array('#type' =>'hidden', '#value'=>$node->fnv_is_draft);
+      $form['fnv_parent_is_testing']    = array('#type' =>'hidden', '#value'=>$node->fnv_is_testing);
+      $form['fnv_parent_is_current']    = array('#type' =>'hidden', '#value'=>$node->fnv_is_current);
+      $form['fnv_parent_is_superseded'] = array('#type' =>'hidden', '#value'=>$node->fnv_is_superseded);
 
       //set not to process on drupal_retrieve_form
       if (!$form["#node"]->new) {
@@ -120,7 +129,6 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
     array_unshift($form["#validate"],"full_node_revision_node_validate");
     array_push($form["#submit"],"full_node_revision_node_submit");
   global $user;
-  $user->view_superseded = 1;
   }
 }
 /*
@@ -130,7 +138,6 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
 function full_node_revision_node_validate($form, &$form_state) {
 
   global $user;
-  $user->view_superseded = 1;
   //Append Draft to end of path if we have a parent record and  there are no paths like it.
   if ($parent_nid = $form_state['values']['fnv_revises']) {
     $src = "node/$parent_nid";
@@ -152,30 +159,23 @@ function full_node_revision_node_submit($form, &$form_state) {
   $status_action = $form_state['values']['fnv_flow_status'];
   $status_action_p = $form_state['values']['fnv_flow_status_previous'];
   if ($status_action == $status_action_p) { $status_action = "none";}
-  //$parent_nid   = $form_state['values']['field_fnv_revises'][0]["nid"];
-  if($parent_node = node_load($form_state['values']['fnv_revises'])) {
-    $parent_exists = true;
-  }
   if ($form["nid"]["#value"] == NULL) {
-    //full_node_version_status_add($parent_nid, "superseded");
       $form_state['values']['fnv_is_testing'] = 0;
       $form_state['values']['fnv_is_current'] = 0;
       $form_state['values']['fnv_is_draft']   = 0;
-      $parent_node->fnv_is_superseded = 1;
+      $form_state['values']['fnv_parent_is_superseded']   = 1;
   }
   switch($status_action) {
     case "make_draft":
     // set parent to testing
 
-      //full_node_version_status_add($parent_nid, "testing");
-      $parent_node->fnv_is_testing = 1;
+      $form_state['values']['fnv_parent_is_testing']   = 1;
       $form_state['values']['fnv_is_draft']   = 1;
       $form_state['values']['fnv_is_testing'] = 0;
     break;
     case "make_testing" :
     // remove parent testing
-      //full_node_version_status_remove($parent_nid, "testing");
-      $parent_node->fnv_is_testing = 0;
+      $form_state['values']['fnv_parent_is_testing']   = 0;
       $form_state['values']['fnv_is_testing'] = 1;
     break;
     case "make_live":
@@ -190,12 +190,16 @@ function full_node_revision_node_submit($form, &$form_state) {
       $form_state['values']['path'] = ereg_replace( "\_\(draft\)$","",$form_state['values']['path'] );
  
       //ajust parent node
-      $parent_node->fnv_is_testing = 0;
-      $parent_node->fnv_is_current = 0;
-      $parent_node->path .= "-" . $parent_node->nid; 
+      $form_state['values']['fnv_parent_is_testing']   = 0;
+      $form_state['values']['fnv_parent_is_current']   = 0;
+      global $user;
+      $user->view_superseded = 1;
+      if($parent_node = node_load($form_state['values']['fnv_revises'])) {
+        $parent_node->path .= "-" . $parent_node->nid; 
+        node_save($parent_node);
+      }
     break;
   }
-  if ($parent_exists) { node_save($parent_node);}
 }
 /*
  * This function change the status of the parent node before the child is removed
@@ -203,7 +207,8 @@ function full_node_revision_node_submit($form, &$form_state) {
  * testing
  */
 function full_node_revision_node_revert($form, &$form_state) { 
-
+  global $user;
+  $user->view_superseded = 1;
   if($parent_node = node_load($form_state['values']['fnv_revises'])) {
     // parent is no longer superseded
     $parent_node->fnv_is_superseded = 0;

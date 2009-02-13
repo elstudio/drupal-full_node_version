@@ -61,6 +61,34 @@ function full_node_version_testing_status_form($form_state) {
       //if not a draft, not superseded and testing does not = current 
   foreach (full_node_version_get_nodes(array('is_draft'=>0,'is_superseded'=>0,'is_testing'=>'!is_current' )) as $n) {
   }
+  foreach($nodes as $nid => $node) {
+
+    $form['testing_status']["$nid-wrapper"]["title"] = array(
+      "#value" => t("<div class = 'form-checkboxes form-title'><div class= 'form-item page'><a href = '/node/$nid'>".$n->title."</a></div></div>"),
+    );
+    $form['testing_status']["$nid-wrapper"]["$nid"] = array(
+      '#type' => 'checkboxes',
+      '#options' => $options,
+      '#default_value' => $default,
+      '#attributes' => array('style' => 'clear:left'),
+    );
+
+    $image_string = "<img src = '/".drupal_get_path("module", "full_node_version")."/tick.png'>";
+    if (!$in_production) {
+      $image_string = "";
+    }
+    $form['testing_status']["$nid-wrapper"]["prod"] = array(
+      '#value' => "
+        <div class = 'form-checkboxes'>
+          <div class = 'form-item double'>$image_string
+          </div>
+        </div>
+      ",
+    );
+
+
+  }
+  /*
   foreach($nodes as $nid => $s) {
     $in_production = false;
     $n = node_load($nid);
@@ -132,6 +160,7 @@ function full_node_version_testing_status_form($form_state) {
     );
 
   }
+  */
 
   $form['testing_status']['submit'] = array(
     '#type' => 'submit',
