@@ -127,7 +127,7 @@ function full_node_version_get_nodes($status=array(), $has_parent=NULL) {
       if (in_array($v, $statuses)) {
         $where_items["$k $operator $v"]    = NULL;
       }
-      elseif (is_numeric($v)) {
+      else {
         $where_items["$k $operator %d"]    = $v;
       }
     }
@@ -267,45 +267,21 @@ function full_node_version_revised_by($n) {
  *   an array of node nids to the function on
  */
 function full_node_version_publish_testing($nids = true) {
-  $nodes = _full_node_version_status_of_nodes_array();
-  foreach ($nodes as $nid => $node_item) {
-    if (in_array($nid, $nids) || $nids == $true)  {
-      $n = node_load($nid);
-      if ($node_item['t'] == 0) {
-        if ($node_item['c'] == 1) {
-          full_node_version_status_remove($nid, "current");
-          drupal_set_message($n->title ." unpublished");
-        }
-        elseif ($node_item['d'] == 1) {
-          $current_nid = $n->field_fnv_revises[0]["nid"];
-          if (($parent_s =$nodes[$current_nid]) && ($parent_s['t'] != $parent_s['c'])) {
-            if($parent_s['t'] == 1) {
-              full_node_version_status_add($current_nid, "current");
-              drupal_set_message($n->title ." published");
-            }
-            else {
-              full_node_version_status_remove($current_nid, "current");
-              drupal_set_message($n->title ." unpublished");
-            }
-            
-          }
-
-        }
-      }  
-      else {
-        if ($node_item['d'] == 1) {
-          $current_nid = $n->field_fnv_revises[0]["nid"];
-          _draft_to_current($nid, $current_nid);
-          drupal_set_message("Draft of ".$n->title." published");
-        }
-        else {
-          full_node_version_status_add($nid, "current");
-          drupal_set_message($n->title." published");
-        }
-      }
+  $nodes = full_node_version_get_nodes(array('is_testing'=>'!is_current'));
+  foreach ($nodes as $node) {
+    if ($node->fnv_is_testing && $node->fnv_is_draft) {
+      drupal_set_message('draft of '.$node->title ." published");
     }
+    elseif ($node->fnv_is_testing) {
+      drupal_set_message($node->title ." published");
+    }
+    else {
+      drupal_set_message($node->title ." unpublished");
+    }
+    $node->fnv_is_current = $node->fnv_is_testing;
+    $node->fnv_is_draft = 0;
+    node_save($node);
   }
-
 }
 
 

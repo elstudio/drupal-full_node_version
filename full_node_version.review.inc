@@ -43,101 +43,41 @@ function full_node_version_testing_status_form($form_state) {
   );
   /*
    */
-  $nodes = _full_node_version_status_of_nodes_array();
         // if node is draft and has a parent then there are two options c and d
-  $nodes = array();
-  //get nodes that are draft with parent current
-  foreach (full_node_version_get_nodes(array('is_draft'=>1), true) as $n) {
-    $nodes[$n->nid]['#node'] =$n;
-    $nodes[$n->nid]['options'] = array("c"=> "", "d"=>"");
-    $nodes[$n->nid]['in_production'] = $n->fvn_parent_is_current;
+  //get all draft nodes and all non-superseded where testing and current do not match
+  $nodes = full_node_version_get_nodes(array('is_draft'=>1));
+  foreach(
+    full_node_version_get_nodes(array('is_draft'=>0,'is_superseded'=>0,'is_testing'=>'!is_current' ))
+    as $nid=>$n) { $nodes[$nid]= $n ;
   }
-  //get nodes that are draft with no parent
-  foreach (full_node_version_get_nodes(array('is_draft'=>1), false) as $n) {
-    $nodes[$n->nid]['#node'] =$n;
-    $nodes[$n->nid]['options'] = array("disabled"=> "", "d"=>"");
-    $nodes[$n->nid]['in_production'] = 0;
-  }
-      //if not a draft, not superseded and testing does not = current 
-  foreach (full_node_version_get_nodes(array('is_draft'=>0,'is_superseded'=>0,'is_testing'=>'!is_current' )) as $n) {
-  }
-  foreach($nodes as $nid => $node) {
-
-    $form['testing_status']["$nid-wrapper"]["title"] = array(
-      "#value" => t("<div class = 'form-checkboxes form-title'><div class= 'form-item page'><a href = '/node/$nid'>".$n->title."</a></div></div>"),
-    );
-    $form['testing_status']["$nid-wrapper"]["$nid"] = array(
-      '#type' => 'checkboxes',
-      '#options' => $options,
-      '#default_value' => $default,
-      '#attributes' => array('style' => 'clear:left'),
-    );
-
-    $image_string = "<img src = '/".drupal_get_path("module", "full_node_version")."/tick.png'>";
-    if (!$in_production) {
+  foreach( $nodes as $nid=>$n) {
+    $default  = array();
+    $options = array();
+    if ($n->fnv_parent_is_current || $n->fnv_is_current) {
+      $image_string = theme('image',drupal_get_path("module", "full_node_version")."/tick.png");
+    }
+    else {
       $image_string = "";
     }
-    $form['testing_status']["$nid-wrapper"]["prod"] = array(
-      '#value' => "
-        <div class = 'form-checkboxes'>
-          <div class = 'form-item double'>$image_string
-          </div>
-        </div>
-      ",
-    );
-
-
-  }
-  /*
-  foreach($nodes as $nid => $s) {
-    $in_production = false;
-    $n = node_load($nid);
-    if ($s['d'] == 1) {
-      $parent_nid = $n->field_fnv_revises[0]["nid"];
-      if ($parent_nid > 0) {
-        // if node is draft and has a parent then there are two options c and d
-        $options = array("c"=> "", "d"=>"");
-        if (full_node_version_is_status($parent_nid, 'current')) {
-          // if node is draft and it has a parent that is current the set is_production
-          $in_production = true;
-        }
-      }
-      else {
-        // if node is draft and has does not have a parent then there is only one option
-        // but not that while it is d it is place in the published column
-        $options = array("disabled"=> "", "d"=>"");
-      }
-      $parent_s = $nodes[$parent_nid];
-      // set defaults if in testing d if parent in testing then c else empty
-      if ($s['t'] == 1 ) {
-        $default = array("d");
-      }
-      else if ($parent_s['t'] ==1) {
-        $default = array("c");
-      }
-      else {
-        $default = array();
-      }
+    if($n->fnv_is_draft && $n->fnv_revises) {
+      $options = array("c"=> "", "d"=>"");
+      if($n->fnv_is_testing) { $default = array('d'); }
+      elseif($n->fnv_parent_is_testing) { $default = array('c'); }
     }
-    else if ($s['s'] ==0 && $s['t'] != $s['c']) {
-      //if not a draft, not superseded and testing does not = current 
-      //then there is one option of d 
+    elseif($n->fnv_is_draft) {
+      $options = array("disabled"=> "", "d"=>"");
+      if($n->fnv_is_testing) { $default = array('d'); }
+      
+    }
+    else {
       $options = array("c"=> "", "disabled"=>"");
-      // set defaut if in testing 
-      // if not in test (and there for in production) set in_production
-      if ($s['t'] == 1 ) {
-        $default = array("d");
-      }
-      else {
-        $default = array();
-        $in_production = true;
-      }
-    }
-    // otherwise (not a draft or superseded or if not superseded testing = current) then skip
-    else { continue;}
-
+      if($n->fnv_is_testing) { $default = array('c'); }
+    } 
+    $form['testing_status']["$nid-wrapper"] = array (
+      '#type' => 'fieldset',
+    );
     $form['testing_status']["$nid-wrapper"]["title"] = array(
-      "#value" => t("<div class = 'form-checkboxes form-title'><div class= 'form-item page'><a href = '/node/$nid'>".$n->title."</a></div></div>"),
+      "#value" => t("<div class = 'form-checkboxes form-title'><div class= 'form-item page'>".l($n->title, 'node/'.$nid)."</div></div>"),
     );
     $form['testing_status']["$nid-wrapper"]["$nid"] = array(
       '#type' => 'checkboxes',
@@ -145,11 +85,6 @@ function full_node_version_testing_status_form($form_state) {
       '#default_value' => $default,
       '#attributes' => array('style' => 'clear:left'),
     );
-
-    $image_string = "<img src = '/".drupal_get_path("module", "full_node_version")."/tick.png'>";
-    if (!$in_production) {
-      $image_string = "";
-    }
     $form['testing_status']["$nid-wrapper"]["prod"] = array(
       '#value' => "
         <div class = 'form-checkboxes'>
@@ -158,9 +93,12 @@ function full_node_version_testing_status_form($form_state) {
         </div>
       ",
     );
-
+ 
   }
-  */
+  $form['nids'] = array(
+    '#type' => 'hidden',
+    '#value'=>  implode(',',array_keys($nodes)),
+  );
 
   $form['testing_status']['submit'] = array(
     '#type' => 'submit',
@@ -182,24 +120,13 @@ function full_node_version_testing_status_form($form_state) {
  */
 function full_node_version_testing_status_form_submit($node, &$form_state) {
   $values = $form_state['values'];
-  $nodes = _full_node_version_status_of_nodes_array();
-  foreach ($nodes as $nid => $s) {
+  $nids  = explode(',',$values['nids']);
+  foreach ($nids as $nid) {
     if ($s = $values[$nid]) {
       $n = node_load($nid);
-      $parent_nid = $n->field_fnv_revises[0]["nid"];
-      $parent_s = $nodes[$parent_nid];
-      if ($s['d']) {
-        full_node_version_status_add($nid, "testing");
-      }
-      else {
-        full_node_version_status_remove($nid, "testing");
-      }
-      if ($s['c']) {
-        full_node_version_status_add($parent_nid, "testing");
-      }
-      else {
-        full_node_version_status_remove($parent_nid, "testing");
-      }
+      $n->fnv_is_testing        = (bool) $s['d'];
+      $n->fnv_parent_is_testing = (bool) $s['c'];
+      node_save($n);
     }
   }
   drupal_set_message("Testing Status Saved");
