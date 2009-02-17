@@ -4,6 +4,7 @@ module_load_include('admin.inc', 'full_node_version');
 module_load_include('node_form.inc', 'full_node_version');
 module_load_include('review.inc', 'full_node_version');
 module_load_include('status.inc', 'full_node_version');
+module_load_include('node_status.inc', 'full_node_version');
 
 
 // $Id: full_node_version.module,v 1.40 2008/02/27 15:32:05 robloach Exp $
@@ -47,8 +48,18 @@ function full_node_version_menu() {
     'access arguments' => array('review testing status'),
     'type' => MENU_NORMAL_ITEM,
   );
+  $items['node/%/fnv_node_status']= array(
+    'title' => t('Full Node Version Status'),
+    'page callback' => 'full_node_version_node_status',
+    'page arguments' => array(1),
+    'access callback' => 'full_node_version_node_status_access',
+    'access arguments' => array('review testing status',1),
+    'type' => MENU_LOCAL_TASK,
+    'weight' => 10
+  );
   return $items;
 }
+
 function full_node_version_translated_menu_link_alter(&$item, $map) { 
   if ($item['link_path'] == 'admin/content/toggle-testing') {
     if ($_SESSION['full_node_version_testing'] == true) {
