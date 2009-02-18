@@ -70,8 +70,8 @@ function full_node_version_testing_status_form($form_state) {
       
     }
     else {
-      $options = array("c"=> "", "disabled"=>"");
-      if($n->fnv_is_testing) { $default = array('c'); }
+      $options = array("d"=> "", "disabled"=>"");
+      if($n->fnv_is_testing) { $default = array('d'); }
     } 
     $form['testing_status']["$nid-wrapper"] = array (
       '#type' => 'fieldset',

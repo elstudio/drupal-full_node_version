@@ -67,7 +67,6 @@ function full_node_version_node_grants($account,$op) {
   if ( user_access('full node version test') 
     || $_SESSION['full_node_version_testing']
   ) {
-    drupal_set_message("in testing");
     $grants['fnv_testing'] = array(1); 
     return $grants;
   }

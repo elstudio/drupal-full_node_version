@@ -198,6 +198,7 @@ function full_node_revision_node_submit($form, &$form_state) {
         $parent_node->path .= "-" . $parent_node->nid; 
         node_save($parent_node);
       }
+      $user->view_superseded = 0;
     break;
   }
 }
@@ -218,5 +219,6 @@ function full_node_revision_node_revert($form, &$form_state) {
     }
     node_save($parent_node);
   }
+  $user->view_superseded = 0;
 
 }

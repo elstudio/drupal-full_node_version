@@ -28,6 +28,12 @@ function full_node_version_admin_form($form_state) {
     '#description' => t('When enabled, when a draft is published, all of the current node comments will be move to the draft node.'),
     '#default_value' => variable_get("full_node_version_move_comments", false),
   );
+  $form['use_cck_fields'] = array(
+    '#type' =>'checkbox',
+    '#title' =>'Put status and revises in CCK fields',
+    '#description' => t('When enabled, CCK fields Full Node Version Status and Revises will be populated with status on load (Requires Node Reference).'),
+    '#default_value' => variable_get("full_node_version_use_cck_fields", false),
+  );
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save'),
@@ -41,21 +47,56 @@ function full_node_version_admin_form($form_state) {
 function full_node_version_admin_form_submit($form, $form_state) {
 
   $selected_types = $form_state['values']['versioned_types'];
-  $move_comments = $form_state['values']['move_comments'] && TRUE;
+  $move_comments  = $form_state['values']['move_comments'] && TRUE;
+  $use_cck_fields     = $form_state['values']['use_cck_fields'] && TRUE;
   $versioned_types = array();
   foreach ($selected_types as $type) {
     if ($type) {
       array_push($versioned_types, $type);
-      _full_node_version_create_cck_fields ($type) ;
+      if($use_cck_fields) {
+        _full_node_version_create_cck_fields ($type) ;
+      }
     }
   }
-  _update_field_fnv_revised_types($versioned_types);
+  if($use_cck_fields) {
+    _update_field_fnv_revised_types($versioned_types);
+  }
+  else {
+   _full_node_version_remove_cck_fields();
+  }
   variable_set('full_node_version_node_types', $versioned_types);
   variable_set('full_node_version_move_comments', $move_comments);
+  variable_set('full_node_version_use_cck_fields', $use_cck_fields);
   drupal_set_message(t('full Node Version Settings have been updated. Please clear the <a href="/admin/settings/performance">cache</a>'));
 }
 
+/*
+ * This is a helper funciton for update the cck field field_fnv_revises that
+ * allows all of the node types to be revised.
+ * @param $versioned_types
+ *     an array of content types that are in versioning
+ */
+function _update_field_fnv_revised_types($versioned_types) {
+  foreach ($versioned_types as $type) {
+    $new_types[$type] = $type;
+  }
+  $global_settings_string = db_result(db_query("select global_settings from {content_node_field} where field_name ='field_fnv_revises'"));
+  $global_settings = unserialize($global_settings_string);
 
+  $global_settings["referenceable_types"] = $new_types;
+  $global_settings_string = serialize($global_settings);
+  db_query("update {content_node_field} set global_settings = '%s' where field_name = 'field_fnv_revises'",$global_settings_string);
+}
+
+
+function _full_node_version_remove_cck_fields () {
+
+  module_load_include('inc', 'content', 'includes/content.crud');
+  foreach(array_keys(node_get_types()) as $type) {
+    content_field_instance_delete('field_fnv_revises', $type);
+    content_field_instance_delete('field_fnv_status', $type);
+  }
+}
 /*
  * Creates fnv_revises and fvn_status cck on a content type
  *
@@ -66,7 +107,7 @@ function full_node_version_admin_form_submit($form, $form_state) {
  *    A content type name
  */
 function _full_node_version_create_cck_fields ($type) {
-module_load_include('inc', 'content', 'includes/content.crud');
+  module_load_include('inc', 'content', 'includes/content.crud');
  
 
   $types = node_get_types();

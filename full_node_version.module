@@ -5,6 +5,7 @@ module_load_include('node_form.inc', 'full_node_version');
 module_load_include('review.inc', 'full_node_version');
 module_load_include('status.inc', 'full_node_version');
 module_load_include('node_status.inc', 'full_node_version');
+module_load_include('testing_state.inc', 'full_node_version');
 
 
 // $Id: full_node_version.module,v 1.40 2008/02/27 15:32:05 robloach Exp $
@@ -27,7 +28,6 @@ function full_node_version_perm() {
 /**
  * Implementation of hook_menu() to add the admin section
  */
-
 function full_node_version_menu() {
   $items = array();
   $items['admin/settings/full_node_version'] = array(
@@ -58,48 +58,6 @@ function full_node_version_menu() {
     'weight' => 10
   );
   return $items;
-}
-
-function full_node_version_translated_menu_link_alter(&$item, $map) { 
-  if ($item['link_path'] == 'admin/content/toggle-testing') {
-    if ($_SESSION['full_node_version_testing'] == true) {
-      $item['title'] = 'Exit Testing';
-    }
-    else {
-      $item['title'] = 'Enter Testing';
-    }
-    if (isset($item['localized_options']['query'])) {
-      if ($item['localized_options']['query'] == 'destination') {                          
-        $item['localized_options']['query'] = drupal_get_destination();                    
-      } 
-    }  
-  }
-}
-function full_node_version_toggle_testing() {
-  if($_SESSION['full_node_version_testing'] == true) {
-    $_SESSION['full_node_version_testing'] = false;
-    drupal_set_message("Exited testing");
-  }
-  else {
-    $_SESSION['full_node_version_testing'] = true;
-    drupal_set_message("Entered testing");
-  }
-  drupal_goto();
-}
-function full_node_version_exit_testing() {
-  $_SESSION['full_node_version_testing'] = false;
-}
-/*
- * Implementation of hook_action_info()
- */
-function full_node_version_action_info () {
-  return array(
-    'full_node_version_publish_testing' => array(
-       'type' => 'system',
-       'description' => t('Promote Testing to Published'),
-       'configurable' => FALSE,
-       )
-  );
 }
 /*
  * Implementation of hook_forms()
