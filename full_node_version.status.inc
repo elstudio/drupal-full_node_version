@@ -8,32 +8,32 @@ function full_node_version_nodeapi(&$node, $op) {
   $full_node_version_node_types = variable_get('full_node_version_node_types',array());
   if (($op=='delete' )) {
     $query = db_query('DELETE FROM {full_node_version} WHERE nid = %d',$node->nid);
-
   }
   if (($op=='load' ) && 
        in_array($type, $full_node_version_node_types)
      ) {
      $row = db_fetch_object(db_query(
-     'SELECT c.*,
-             p.is_draft as parent_is_draft,
-             p.is_current as parent_is_current,
-             p.is_testing as parent_is_testing,
-             p.is_superseded as parent_is_superseded
-             FROM {full_node_version} c 
-             LEFT JOIN {full_node_version p ON p.nid = c.revises
-             WHERE c.nid =%d',$node->nid));
-     $revised_by = db_result(db_query('SELECT * FROM {full_node_version} WHERE revises =%d',$node->nid));
+       'SELECT c.*,
+          p.is_draft as parent_is_draft,
+          p.is_current as parent_is_current,
+          p.is_testing as parent_is_testing,
+          p.is_superseded as parent_is_superseded
+          FROM {full_node_version} c 
+          LEFT JOIN {full_node_version p ON p.nid = c.revises
+          WHERE c.nid =%d', $node->nid
+        ));
+     $revised_by = db_result(db_query('SELECT * FROM {full_node_version} WHERE revises =%d', $node->nid));
 
-     $node->fnv_is_draft      = $row->is_draft;
-     $node->fnv_is_testing    = $row->is_testing;
-     $node->fnv_is_current    = $row->is_current;
-     $node->fnv_is_superseded = $row->is_superseded;
-     $node->fnv_parent_is_draft      = $row->parent_is_draft;
-     $node->fnv_parent_is_testing    = $row->parent_is_testing;
-     $node->fnv_parent_is_current    = $row->parent_is_current;
-     $node->fnv_parent_is_superseded = $row->parent_is_superseded;
-     $node->fnv_revises       = $row->revises;
-     $node->fnv_revised_by    = $revised_by;
+     $node->fnv_is_draft              = $row->is_draft;
+     $node->fnv_is_testing            = $row->is_testing;
+     $node->fnv_is_current            = $row->is_current;
+     $node->fnv_is_superseded         = $row->is_superseded;
+     $node->fnv_parent_is_draft       = $row->parent_is_draft;
+     $node->fnv_parent_is_testing     = $row->parent_is_testing;
+     $node->fnv_parent_is_current     = $row->parent_is_current;
+     $node->fnv_parent_is_superseded  = $row->parent_is_superseded;
+     $node->fnv_revises               = $row->revises;
+     $node->fnv_revised_by            = $revised_by;
      if ($node->field_fnv_status) {
        if($node->fnv_is_draft) $field_fnv_status[]      = array("value"=>"draft");
        if($node->fnv_is_testing) $field_fnv_status[]    = array("value"=>"testing");
@@ -54,12 +54,12 @@ function full_node_version_nodeapi(&$node, $op) {
      ) {
     $query = db_query('
     INSERT INTO {full_node_version} (nid,is_draft,is_testing, is_current, is_superseded,revises)
-    VALUES(%d, %d, %d,%d,%d,%d) 
+    VALUES(%d, %d, %d, %d, %d, %d) 
     ON DUPLICATE KEY UPDATE 
-      is_draft =%d, 
-      is_testing =%d, 
-      is_current =%d, 
-      is_superseded =%d, 
+      is_draft = %d, 
+      is_testing = %d, 
+      is_current = %d, 
+      is_superseded = %d, 
       revises = %d',
       $node->nid,
       $node->fnv_is_draft,
@@ -91,12 +91,12 @@ function full_node_version_nodeapi(&$node, $op) {
     if ($node->fnv_revises) {
       $query = db_query('
       INSERT INTO {full_node_version} (nid,is_draft,is_testing, is_current, is_superseded)
-      VALUES(%d, %d, %d,%d,%d) 
+      VALUES(%d, %d, %d, %d, %d) 
       ON DUPLICATE KEY UPDATE 
-        is_draft =%d, 
-        is_testing =%d, 
-        is_current =%d, 
-        is_superseded =%d',
+        is_draft = %d, 
+        is_testing = %d, 
+        is_current = %d, 
+        is_superseded = %d',
         $node->fnv_revises,
         $node->fnv_parent_is_draft,
         $node->fnv_parent_is_testing,
@@ -153,7 +153,7 @@ function full_node_version_get_nodes($status=array(), $has_parent=NULL) {
          FROM {full_node_version} c 
     LEFT JOIN {full_node_version} p ON c.revises = p.nid
               $where_clause
-    ",$where_items);
+    ", $where_items);
   $nodes = array();
   while($row = db_fetch_object($result)) {
    $nodes[$row->nid] = node_load($row->nid);
@@ -190,7 +190,6 @@ function full_node_version_publish_testing($nids = true) {
 
 
 function full_node_version_fnv_publish_draft($draft_nid, $current_nid) {
-
   // =======  For Panels ==========//
   if (module_exists("panels")) {
     $panes = array();
@@ -213,7 +212,13 @@ function full_node_version_fnv_publish_draft($draft_nid, $current_nid) {
 function _full_node_version_new_draft_panel($child_did, $parent_did) {
 
 
-db_query("UPDATE {panels_display} child , {panels_display} parent SET child.layout_settings=parent.layout_settings,child.panel_settings=parent.panel_settings,child.layout=parent.layout WHERE child.did=%d and parent.did=%d",$child_did, $parent_did);
+db_query("UPDATE {panels_display} child , {panels_display} parent 
+  SET child.layout_settings = parent.layout_settings,
+    child.panel_settings = parent.panel_settings,
+    child.layout = parent.layout 
+  WHERE child.did = %d 
+  AND parent.did = %d",
+  $child_did, $parent_did);
 db_query("INSERT INTO panels_pane (did, panel, type, subtype, shown, access, visibility, configuration, cache, position) SELECT %d, panel, type, subtype, shown, access, visibility, configuration, cache, position FROM panels_pane WHERE did = %d", $child_did, $parent_did);
 
 

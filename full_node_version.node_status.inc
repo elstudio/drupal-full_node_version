@@ -17,7 +17,6 @@ function full_node_version_node_status_access($access,$nid) {
 function full_node_version_node_status($nid) {
   $node = node_load($nid);
   return drupal_get_form('full_node_version_node_status_form',$node);
-
 }
 
 /**
@@ -59,7 +58,6 @@ function full_node_version_node_status_form($form_state,$node) {
   elseif($node->fnv_is_draft) {
     $live_options = array("d"=>"Draft");
     if($node->fnv_is_current) { $live_default = array('d'); }
-    
   }
   else {
     $live_options = array("d"=> "Current");
@@ -128,6 +126,5 @@ function full_node_version_node_status_form_submit($form, &$form_state) {
   }
   node_save($node);
   drupal_set_message(t('Status updated'));
-
 }
 

@@ -85,12 +85,12 @@ function _update_field_fnv_revised_types($versioned_types) {
 
   $global_settings["referenceable_types"] = $new_types;
   $global_settings_string = serialize($global_settings);
-  db_query("update {content_node_field} set global_settings = '%s' where field_name = 'field_fnv_revises'",$global_settings_string);
+  db_query("update {content_node_field} set global_settings = '%s' where field_name = 'field_fnv_revises'", $global_settings_string);
 }
 
 
 function _full_node_version_remove_cck_fields () {
-
+  # FIXME: So we're not requiring CCK, but need it to uninstall. Is .info right, Erik?
   module_load_include('inc', 'content', 'includes/content.crud');
   foreach(array_keys(node_get_types()) as $type) {
     content_field_instance_delete('field_fnv_revises', $type);
@@ -151,7 +151,6 @@ function _full_node_version_create_cck_fields ($type) {
       'optionwidgets',),);
 
   if (!(content_fields('field_fnv_status', $type))) {
-
     $field_fnv_status['type_name'] = $type;
     content_field_instance_create($field_fnv_status); 
   }
