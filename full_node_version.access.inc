@@ -1,4 +1,5 @@
 <?php
+// $Id$ 
 /**
  * Implementation of  hook_node_access_records
  *
@@ -62,7 +63,7 @@ function full_node_version_node_access_records($node) {
  *  testing, working and superseded.  
  *  It also grants all to gid 1 so that all content not associated with full node revision is displayed.
  */
-function full_node_version_node_grants($account,$op) {
+function full_node_version_node_grants($account, $op) {
   global $user;
   if ( user_access('full node version test') 
     || $_SESSION['full_node_version_testing']

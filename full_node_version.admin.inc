@@ -1,4 +1,5 @@
 <?php
+// $Id$
 /**
  * This function builds the admin page
  */
@@ -11,36 +12,36 @@ function full_node_version_admin() {
 function full_node_version_admin_form($form_state) {
   $types = node_get_types();
   $options = array();
-  $selected_types = variable_get('full_node_version_node_types',array());
-  foreach ($types as $key=>$type) {
+  $selected_types = variable_get('full_node_version_node_types', array());
+  foreach ($types as $key => $type) {
   $options[$key] = t($type->name);
   }
   $form['versioned_types'] = array(
-    '#type' => 'checkboxes',
-    '#title' => t('Enable Full Node Version On'),
-    '#description' => t("The following node types will have full node versioning enabled."),
-    '#options' => $options,
+    '#type'          => 'checkboxes',
+    '#title'         => t('Enable Full Node Version On'),
+    '#description'   => t("The following node types will have full node versioning enabled."),
+    '#options'       => $options,
     '#default_value' => $selected_types,
   );
   $form['move_comments'] = array(
-    '#type' =>'checkbox',
-    '#title' =>'Move comments on Publish',
-    '#description' => t('When enabled, when a draft is published, all of the current node comments will be move to the draft node.'),
-    '#default_value' => variable_get("full_node_version_move_comments", false),
+    '#type'          => 'checkbox',
+    '#title'         => 'Move comments on Publish',
+    '#description'   => t('When enabled, when a draft is published, all of the current node comments will be move to the draft node.'),
+    '#default_value' => variable_get("full_node_version_move_comments", FALSE),
   );
 
   $form['use_cck_fields'] = array(
-    '#type' =>'checkbox',
-    '#title' =>'Put status and revises in CCK fields',
-    '#description' => t('When enabled, CCK fields Full Node Version Status and Revises will be populated with status on load (Requires Node Reference).'),
-    '#default_value' => variable_get("full_node_version_use_cck_fields", false),
+    '#type'          => 'checkbox',
+    '#title'         => 'Put status and revises in CCK fields',
+    '#description'   => t('When enabled, CCK fields Full Node Version Status and Revises will be populated with status on load (Requires Node Reference).'),
+    '#default_value' => variable_get("full_node_version_use_cck_fields", FALSE),
   );
   if (!(module_exists("nodereference"))) {
-  $form['use_cck_fields']['#attributes'] = array('disabled'=>'disabled');
+  $form['use_cck_fields']['#attributes'] = array('disabled' => 'disabled');
    
   }
   $form['submit'] = array(
-    '#type' => 'submit',
+    '#type'  => 'submit',
     '#value' => t('Save'),
   );
   return $form;
@@ -58,13 +59,13 @@ function full_node_version_admin_form_submit($form, $form_state) {
   foreach ($selected_types as $type) {
     if ($type) {
       array_push($versioned_types, $type);
-      if($use_cck_fields) {
-        _full_node_version_create_cck_fields ($type) ;
+      if ($use_cck_fields) {
+        _full_node_version_create_cck_fields($type) ;
       }
     }
   }
   
-  if($use_cck_fields) {
+  if ($use_cck_fields) {
     if ((module_exists("nodereference"))) {
       _update_field_fnv_revised_types($versioned_types);
     }
@@ -98,10 +99,10 @@ function _update_field_fnv_revised_types($versioned_types) {
 }
 
 
-function _full_node_version_remove_cck_fields () {
+function _full_node_version_remove_cck_fields() {
    if ((module_exists("content"))) {
     module_load_include('inc', 'content', 'includes/content.crud');
-    foreach(array_keys(node_get_types()) as $type) {
+    foreach (array_keys(node_get_types()) as $type) {
       content_field_instance_delete('field_fnv_revises', $type);
       content_field_instance_delete('field_fnv_status', $type);
     }
@@ -116,49 +117,49 @@ function _full_node_version_remove_cck_fields () {
  * @param $type
  *    A content type name
  */
-function _full_node_version_create_cck_fields ($type) {
+function _full_node_version_create_cck_fields($type) {
   module_load_include('inc', 'content', 'includes/content.crud');
  
 
   $types = node_get_types();
-  foreach ($types as $typename =>$trash) {
+  foreach ($types as $typename => $trash) {
     $types[$typename] = 0;
   }
   $types[$type] = $type;
   $field_fnv_revises = 
-    array ( 'field_name' => 'field_fnv_revises', 'type_name'
-      => 'page', 'display_settings' => array ( 'label' => array ( 'format' =>
-      'above',), 'teaser' => array ( 'format' => 'default',), 'full' => array (
-      'format' => 'default',), 4 => array ( 'format' => 'default',), 2 => array (
-      'format' => 'default',), 3 => array ( 'format' => 'default',),),
+    array( 'field_name' => 'field_fnv_revises', 'type_name'
+      => 'page', 'display_settings' => array( 'label' => array( 'format' =>
+      'above', ), 'teaser' => array( 'format' => 'default', ), 'full' => array(
+      'format' => 'default', ), 4 => array( 'format' => 'default', ), 2 => array(
+      'format' => 'default', ), 3 => array( 'format' => 'default', ), ),
       'widget_active' => '1', 'type' => 'nodereference', 'required' => '0',
       'multiple' => '0', 'db_storage' => '1', 'module' => 'nodereference', 'active'
-      => '1', 'locked' => '0', 'columns' => array ( 'nid' => array ( 'type' =>
-      'int', 'unsigned' => true, 'not null' => false,),), 'referenceable_types' =>
+      => '1', 'locked' => '0', 'columns' => array( 'nid' => array( 'type' =>
+      'int', 'unsigned' => TRUE, 'not null' => FALSE, ), ), 'referenceable_types' =>
       $types, 'advanced_view' => '--', 'advanced_view_args' => '',
-      'widget' => array ( 'default_value' => array ( 0 => array ( 'nid' => NULL,
+      'widget' => array( 'default_value' => array( 0 => array( 'nid' => NULL,
       '_error_element' =>
-      'default_value_widget][field_fnv_revises][0][nid][nid',),),
+      'default_value_widget][field_fnv_revises][0][nid][nid', ), ),
       'default_value_php' => NULL, 'label' => 'Revises', 'weight' => NULL,
       'description' => '', 'type' => 'nodereference_autocomplete', 'module' =>
-      'nodereference',),);
+      'nodereference', ), );
 
   $field_fnv_status = 
-    array ( 'field_name' => 'field_fnv_status', 'type_name' => 'page',
-      'display_settings' => array ( 'label' => array ( 'format' => 'above',),
-      'teaser' => array ( 'format' => 'default',), 'full' => array ( 'format' =>
-      'default',), 4 => array ( 'format' => 'default',), 2 => array ( 'format' =>
-      'default',), 3 => array ( 'format' => 'default',),), 'widget_active' => '1',
+    array( 'field_name' => 'field_fnv_status', 'type_name' => 'page',
+      'display_settings' => array( 'label' => array( 'format' => 'above', ),
+      'teaser' => array( 'format' => 'default', ), 'full' => array( 'format' =>
+      'default', ), 4 => array( 'format' => 'default', ), 2 => array( 'format' =>
+      'default', ), 3 => array( 'format' => 'default', ), ), 'widget_active' => '1',
       'type' => 'text', 'required' => '0', 'multiple' => '3', 'db_storage' => '0',
-      'module' => 'text', 'active' => '1', 'locked' => '0', 'columns' => array (
-      'value' => array ( 'type' => 'text', 'size' => 'big', 'not null' => false,
-      'sortable' => true,),), 'text_processing' => '0', 'max_length' => '',
+      'module' => 'text', 'active' => '1', 'locked' => '0', 'columns' => array(
+      'value' => array( 'type' => 'text', 'size' => 'big', 'not null' => FALSE,
+      'sortable' => TRUE, ), ), 'text_processing' => '0', 'max_length' => '',
       'allowed_values' => "draft\ncurrent\nsuperseded\ntesting", 'allowed_values_php'
-      => '', 'widget' => array ( 'default_value' => array ( 0 => array ( 'value' =>
-      '', '_error_element' => 'default_value_widget][field_fnv_status][value',),),
+      => '', 'widget' => array( 'default_value' => array( 0 => array( 'value' =>
+      '', '_error_element' => 'default_value_widget][field_fnv_status][value', ), ),
       'default_value_php' => NULL, 'label' => 'Full Node Version Status', 'weight' =>
       NULL, 'description' => '', 'type' => 'optionwidgets_buttons', 'module' =>
-      'optionwidgets',),);
+      'optionwidgets', ), );
 
   if (!(content_fields('field_fnv_status', $type))) {
     $field_fnv_status['type_name'] = $type;
