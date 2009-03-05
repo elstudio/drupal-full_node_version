@@ -17,12 +17,12 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
     $node = $form["#node"];
     $type = $form["type"]["#value"];
     //grab current node fnv info
-    $form['fnv_revises']       = array('#type' =>'hidden', '#value'=>$node->fnv_revises);
-    $form['fnv_is_draft']      = array('#type' =>'hidden', '#value'=>$node->fnv_is_draft);
-    $form['fnv_is_testing']    = array('#type' =>'hidden', '#value'=>$node->fnv_is_testing);
-    $form['fnv_is_current']    = array('#type' =>'hidden', '#value'=>$node->fnv_is_current);
-    $form['fnv_is_superseded'] = array('#type' =>'hidden', '#value'=>$node->fnv_is_superseded);
-    $form['fnv_revised_by']       = array('#type' =>'hidden', '#value'=>$node->fnv_revise_by);
+    $form['fnv_revises']              = array('#type' =>'hidden', '#value'=>$node->fnv_revises);
+    $form['fnv_is_draft']             = array('#type' =>'hidden', '#value'=>$node->fnv_is_draft);
+    $form['fnv_is_testing']           = array('#type' =>'hidden', '#value'=>$node->fnv_is_testing);
+    $form['fnv_is_current']           = array('#type' =>'hidden', '#value'=>$node->fnv_is_current);
+    $form['fnv_is_superseded']        = array('#type' =>'hidden', '#value'=>$node->fnv_is_superseded);
+    $form['fnv_revised_by']           = array('#type' =>'hidden', '#value'=>$node->fnv_revise_by);
     $form['fnv_parent_is_draft']      = array('#type' =>'hidden', '#value'=>$node->fnv_parent_is_draft);
     $form['fnv_parent_is_testing']    = array('#type' =>'hidden', '#value'=>$node->fnv_parent_is_testing);
     $form['fnv_parent_is_current']    = array('#type' =>'hidden', '#value'=>$node->fnv_parent_is_current);
@@ -123,12 +123,12 @@ function full_node_version_form_alter(&$form, $form_state, $form_id) {
       array_unshift($form['buttons']['delete']["#submit"],"full_node_revision_node_revert");
       $form['buttons']['delete']["#value"] = "Delete Draft";
     }
-    $form['buttonstop']['#weight'] = -100;
-    $form['buttonstop']['#type'] = 'fieldset';
-    $form['buttonstop']['#attributes'] = array('class'=>"full_node_version_status");
-    $form['buttonstop']['submit'] = $form['buttons']['submit'] ;
-    $form['buttonstop']['preview']   = $form['buttons']['preview'];
-    $form['buttonstop']['delete']   = $form['buttons']['delete'];
+    $form['buttonstop']['#weight']      = -100;
+    $form['buttonstop']['#type']        = 'fieldset';
+    $form['buttonstop']['#attributes']  = array('class'=>"full_node_version_status");
+    $form['buttonstop']['submit']       = $form['buttons']['submit'] ;
+    $form['buttonstop']['preview']      = $form['buttons']['preview'];
+    $form['buttonstop']['delete']       = $form['buttons']['delete'];
 
     //add our submit function
     array_unshift($form["#validate"],"full_node_revision_node_validate");
@@ -172,28 +172,24 @@ function full_node_revision_node_submit($form, &$form_state) {
   }
   switch($status_action) {
     case "make_draft":
-    // set parent to testing
-
+      // set parent to testing
       $form_state['values']['fnv_parent_is_testing']   = 1;
       $form_state['values']['fnv_is_draft']   = 1;
       $form_state['values']['fnv_is_testing'] = 0;
     break;
     case "make_testing" :
-    // remove parent testing
+      // remove parent testing
       $form_state['values']['fnv_parent_is_testing']   = 0;
       $form_state['values']['fnv_is_testing'] = 1;
     break;
     case "make_live":
-    // set parent to not current 
+      // set parent to not current 
       //_draft_to_current($form["nid"]["#value"] , $parent_nid);
-
-
       $form_state['values']['fnv_is_testing'] = 1;
       $form_state['values']['fnv_is_current'] = 1;
       $form_state['values']['fnv_is_draft']   = 0;
       $form_state['values']['fnv_is_draft']   = 0;
       $form_state['values']['path'] = ereg_replace( "\_\(draft\)$","",$form_state['values']['path'] );
- 
       //ajust parent node
       $form_state['values']['fnv_parent_is_testing']   = 0;
       $form_state['values']['fnv_parent_is_current']   = 0;

@@ -1,11 +1,7 @@
-; $Id: feeder.info,v 1.2 2008/02/27 15:32:05 robloach Exp $
-name = Full Node Version
-description = Creates a system for creating versions of Nodes by create new nodes
-core = 6.x
-
-; Information added by drupal.org packaging script on 2008-02-27
+; $Id: $
+name = full_node_version
+description = Creates a system for creating versions of Nodes, test and production, say, by copying nodes and manipulating permissions
 version = "6.x-1.0-dev"
 core = "6.x"
-
 datestamp = "1204126811"
 
