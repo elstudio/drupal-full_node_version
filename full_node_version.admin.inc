@@ -28,12 +28,17 @@ function full_node_version_admin_form($form_state) {
     '#description' => t('When enabled, when a draft is published, all of the current node comments will be move to the draft node.'),
     '#default_value' => variable_get("full_node_version_move_comments", false),
   );
+
   $form['use_cck_fields'] = array(
     '#type' =>'checkbox',
     '#title' =>'Put status and revises in CCK fields',
     '#description' => t('When enabled, CCK fields Full Node Version Status and Revises will be populated with status on load (Requires Node Reference).'),
     '#default_value' => variable_get("full_node_version_use_cck_fields", false),
   );
+  if (!(module_exists("nodereference"))) {
+  $form['use_cck_fields']['#attributes'] = array('disabled'=>'disabled');
+   
+  }
   $form['submit'] = array(
     '#type' => 'submit',
     '#value' => t('Save'),
@@ -58,16 +63,22 @@ function full_node_version_admin_form_submit($form, $form_state) {
       }
     }
   }
+  
   if($use_cck_fields) {
-    _update_field_fnv_revised_types($versioned_types);
+    if ((module_exists("nodereference"))) {
+      _update_field_fnv_revised_types($versioned_types);
+    }
   }
   else {
-   _full_node_version_remove_cck_fields();
+     if ((module_exists("content"))) {
+      _full_node_version_remove_cck_fields();
+    }
   }
   variable_set('full_node_version_node_types', $versioned_types);
   variable_set('full_node_version_move_comments', $move_comments);
   variable_set('full_node_version_use_cck_fields', $use_cck_fields);
-  drupal_set_message(t('full Node Version Settings have been updated. Please clear the <a href="/admin/settings/performance">cache</a>'));
+  drupal_set_message(t('full Node Version Settings have been updated'));
+  node_access_needs_rebuild(TRUE);
 }
 
 /*
