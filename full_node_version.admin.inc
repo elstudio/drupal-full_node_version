@@ -70,9 +70,7 @@ function full_node_version_admin_form_submit($form, $form_state) {
     }
   }
   else {
-     if ((module_exists("content"))) {
-      _full_node_version_remove_cck_fields();
-    }
+    _full_node_version_remove_cck_fields();
   }
   variable_set('full_node_version_node_types', $versioned_types);
   variable_set('full_node_version_move_comments', $move_comments);
@@ -101,11 +99,12 @@ function _update_field_fnv_revised_types($versioned_types) {
 
 
 function _full_node_version_remove_cck_fields () {
-  # FIXME: So we're not requiring CCK, but need it to uninstall. Is .info right, Erik?
-  module_load_include('inc', 'content', 'includes/content.crud');
-  foreach(array_keys(node_get_types()) as $type) {
-    content_field_instance_delete('field_fnv_revises', $type);
-    content_field_instance_delete('field_fnv_status', $type);
+   if ((module_exists("content"))) {
+    module_load_include('inc', 'content', 'includes/content.crud');
+    foreach(array_keys(node_get_types()) as $type) {
+      content_field_instance_delete('field_fnv_revises', $type);
+      content_field_instance_delete('field_fnv_status', $type);
+    }
   }
 }
 /*
