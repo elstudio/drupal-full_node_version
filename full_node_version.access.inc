@@ -63,14 +63,15 @@ function full_node_version_node_access_records($node) {
  *  It also grants all to gid 1 so that all content not associated with full node revision is displayed.
  */
 function full_node_version_node_grants($account,$op) {
-
+  global $user;
   if ( user_access('full node version test') 
     || $_SESSION['full_node_version_testing']
   ) {
     $grants['fnv_testing'] = array(1); 
     return $grants;
   }
-  if ( user_access('full node version live') ) {
+  if ( user_access('full node version live')  
+    || $user->uid == 0) {
     $grants['fnv_current'] = array(1); 
   }
   if ( user_access('full node version active') ) {
