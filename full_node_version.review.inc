@@ -76,7 +76,6 @@ function full_node_version_testing_status_form($form_state) {
     $form['testing_status']["$nid-wrapper"] = array (
       '#type' => 'fieldset',
     );
-    # FIXME: Need to escape $n->title in the l function below?
     $form['testing_status']["$nid-wrapper"]["title"] = array(
       "#value" => t("<div class = 'form-checkboxes form-title'><div class= 'form-item page'>".l($n->title, 'node/'.$nid)."</div></div>"),
     );
