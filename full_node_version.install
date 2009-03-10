@@ -43,7 +43,7 @@ function full_node_version_schema() {
   return $schema;
 }
 
-function full_node_version_uninstall()i {
+function full_node_version_uninstall() {
     drupal_uninstall_schema('full_node_version');
 }
 function full_node_version_install() {
