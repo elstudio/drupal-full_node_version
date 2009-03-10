@@ -4,9 +4,8 @@ version In Testing.  If allows for all aspects of the node to be different in
 this two location (They are infact different nodes). It also allows for all of
 the change that are In Testing to be moved to Live.
 
-I wrote it with Eric Johnson of the Case foundation.  If one is not a gitter
-then it can be download at
-http://github.com/casefoundation/drupal-full_node_version/tree/master# Install
+
+INSTALLATION AND USE
 
 There are a few things that one needs to do and keep in mind when setting up
 the module.  Enable FNV on content types
@@ -33,9 +32,12 @@ So There are three "sites" when we have full Node version:
           o it show all Draft Versions
           o it there is no Draft Version then it show the Current Version
     * Testing: this is the site seen when one enters testing mode
-          o show either Current or Draft, or neither depending on which has a status of testing
+          o show either Current or Draft, or neither depending on which 
+            has a status of testing
 
-On Node Options
+
+
+ON NODE OPTIONS
 
 On each node is a new tab that allows a user to change which version is on each
 site.  Also on node edit one can change the status of the Draft Version Review
