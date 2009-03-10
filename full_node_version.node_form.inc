@@ -1,5 +1,5 @@
 <?php
-// $Id$
+// $Id: full_node_version.node_form.inc,v 1.1 2009/03/10 18:25:31 elstudio Exp $
 /**
  * Implements hook_form_alter()
  * Here forms for nodes that have been selected in the admin section are modified

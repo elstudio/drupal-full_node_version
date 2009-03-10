@@ -1,5 +1,5 @@
 <?php
-// $Id$
+// $Id: full_node_version.review.inc,v 1.1 2009/03/10 18:25:31 elstudio Exp $
 /*
  * This fuction builds a page to list all nodes of intererst 
  * and thier testing status.

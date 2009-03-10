@@ -1,5 +1,5 @@
 <?php
-// $Id: full_node_version.module,v 1.40 2008/02/27 15:32:05 robloach Exp $
+// $Id: full_node_version.module,v 1.1 2009/03/10 18:25:31 elstudio Exp $
 module_load_include('access.inc', 'full_node_version');
 module_load_include('admin.inc', 'full_node_version');
 module_load_include('node_form.inc', 'full_node_version');

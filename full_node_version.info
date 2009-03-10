@@ -1,4 +1,4 @@
-; $Id: $
+; $Id: full_node_version.info,v 1.1 2009/03/10 18:25:31 elstudio Exp $
 name = full_node_version
 description = Creates a system for creating versions of Nodes, test and production, say, by copying nodes and manipulating permissions
 version = "6.x-1.0-dev"

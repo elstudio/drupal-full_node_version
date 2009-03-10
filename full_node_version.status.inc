@@ -1,5 +1,5 @@
 <?php
-// $Id$
+// $Id: full_node_version.status.inc,v 1.1 2009/03/10 18:25:31 elstudio Exp $
 /*
  * implimentations of hook_nodeapi()
  */
